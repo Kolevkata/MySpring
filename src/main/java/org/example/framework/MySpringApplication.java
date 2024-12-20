@@ -1,7 +1,6 @@
 package org.example.framework;
 
-import org.example.framework.annotations.Component;
-import org.example.framework.core.AnnotationScanner;
+import org.example.framework.core.IOContainer;
 
 import java.util.logging.Logger;
 
@@ -9,9 +8,9 @@ public class MySpringApplication {
     private static final Logger log = Logger.getLogger(MySpringApplication.class.getName());
 
     public static void start() {
-        log.info("Starting application");
-        AnnotationScanner.scanForAnnotation(Component.class)
-                .forEach(clazz ->
-                        log.info(String.format("Found component: %s", clazz.getName())));
+        IOContainer ioc = IOContainer.getInstance();
+        log.info("Application started");
+        ioc.getBean(MyComponent.class).printB();
     }
+
 }
