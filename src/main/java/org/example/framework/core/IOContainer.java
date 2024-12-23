@@ -1,6 +1,7 @@
 package org.example.framework.core;
 
 import org.example.framework.annotations.Component;
+import org.example.framework.annotations.Controller;
 import org.example.framework.annotations.Inject;
 
 import java.lang.reflect.Constructor;
@@ -22,9 +23,10 @@ public class IOContainer {
     private Map<String, Object> beans = new HashMap<>();
 
     private IOContainer() {
-        List<Class<?>> components = AnnotationScanner.scanForAnnotation(Component.class);
+        List<Class<?>> beanClasses = AnnotationScanner.scanForAnnotation(Component.class);
+        beanClasses.addAll(AnnotationScanner.scanForAnnotation(Controller.class));
 
-        components.forEach(clazz -> {
+        beanClasses.forEach(clazz -> {
             Object instance = createBean(clazz);
             beans.put(clazz.getName(), instance);
         });
@@ -91,4 +93,9 @@ public class IOContainer {
         }
         return clazz.cast(bean); // Safely cast the bean to the desired type
     }
+
+    public Map<String, Object> getBeans() {
+        return beans;
+    }
+
 }
