@@ -10,7 +10,6 @@ public class MySpringApplication {
     public static void start() {
         IOContainer ioc = IOContainer.getInstance();
         log.info("Application started");
-        ioc.getBean(MyComponent.class).printB();
     }
 
 }
