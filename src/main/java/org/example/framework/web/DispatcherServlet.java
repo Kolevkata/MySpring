@@ -1,27 +1,28 @@
-package org.example.framework.core;
+package org.example.framework.web;
 
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.example.framework.annotations.Controller;
 import org.example.framework.annotations.RequestMapping;
+import org.example.framework.core.IOContainer;
+import org.example.framework.util.Mapper;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 public class DispatcherServlet extends HttpServlet {
     private static final Logger log = Logger.getLogger(DispatcherServlet.class.getName());
     //request mapping to method
-    private final Map<String, Method> handlerMapping = new HashMap<>();
+    List<Endpoint> endpoints = new ArrayList<>();
     //method wto controller instance
-    private final Map<Method, Object> controllerMapping = new HashMap<>();
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -31,10 +32,10 @@ public class DispatcherServlet extends HttpServlet {
             if (instance.getClass().isAnnotationPresent(Controller.class)) {
                 for (Method method : instance.getClass().getDeclaredMethods()) {
                     if (method.isAnnotationPresent(RequestMapping.class)) {
-                        String path = method.getAnnotation(RequestMapping.class).value();
-                        log.info("Mapping " + path + " to " + method.getName());
-                        handlerMapping.put(path, method);
-                        controllerMapping.put(method, instance);
+                        RequestMapping annotation = method.getAnnotation(RequestMapping.class);
+                        log.info("Mapping " + annotation.path() + " to " + method.getName());
+                        Endpoint endpoint = new Endpoint(method, instance.getClass(), annotation.method(), annotation.path());
+                        endpoints.add(endpoint);
                     }
                 }
             }
@@ -44,12 +45,16 @@ public class DispatcherServlet extends HttpServlet {
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String path = req.getRequestURI();
-        Method handler = handlerMapping.get(path);
+        RequestType requestType = Mapper.stringToRequestType(req.getMethod());
+        Optional<Endpoint> endpoint = Endpoint.get(endpoints, requestType, path);
 
-        if (handler != null) {
+        if (endpoint.isPresent()) {
             try {
-                Object controller = controllerMapping.get(handler);
-                Object result = handler.invoke(controller);
+                IOContainer ioc = IOContainer.getInstance();
+
+                //get the controller instance from ioc container
+                Object controller = ioc.getBean(endpoint.get().getController());
+                Object result = endpoint.get().getMethod().invoke(controller);
 
                 resp.setContentType("text/plain");
                 resp.getWriter().write(result.toString());

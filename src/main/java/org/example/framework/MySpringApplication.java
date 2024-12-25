@@ -1,12 +1,10 @@
 package org.example.framework;
 
-import jakarta.servlet.http.HttpServlet;
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Wrapper;
-import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.startup.Tomcat;
-import org.example.framework.core.DispatcherServlet;
+import org.example.framework.web.DispatcherServlet;
 import org.example.framework.core.IOContainer;
 
 import java.io.File;

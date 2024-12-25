@@ -86,12 +86,20 @@ public class IOContainer {
         }
     }
 
-    public <T> T getBean(Class<T> clazz) {
+//    public <T> T getBeanAndCast(Class<T> clazz) {
+//        Object bean = beans.get(clazz.getName());
+//        if (bean == null) {
+//            throw new RuntimeException("No bean found for type: " + clazz.getName());
+//        }
+//        return clazz.cast(bean); // Safely cast the bean to the desired type
+//    }
+
+    public Object getBean(Class<?> clazz) {
         Object bean = beans.get(clazz.getName());
         if (bean == null) {
             throw new RuntimeException("No bean found for type: " + clazz.getName());
         }
-        return clazz.cast(bean); // Safely cast the bean to the desired type
+        return bean;
     }
 
     public Map<String, Object> getBeans() {
