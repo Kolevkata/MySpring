@@ -1,4 +1,8 @@
 target/
+temp/
+tomcat.8080
+.idea/
+untitled/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
