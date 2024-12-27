@@ -54,7 +54,8 @@ public class DispatcherServlet extends HttpServlet {
 
                 //get the controller instance from ioc container
                 Object controller = ioc.getBean(endpoint.get().getController());
-                Object result = endpoint.get().getMethod().invoke(controller);
+                Method method = endpoint.get().getMethod();
+                Object result = method.invoke(controller);
 
                 resp.setContentType("text/plain");
                 resp.getWriter().write(result.toString());
