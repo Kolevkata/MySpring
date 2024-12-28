@@ -9,7 +9,7 @@ import org.example.framework.web.RequestType;
 @org.example.framework.annotations.Controller
 public class Controller {
     @RequestMapping(path = "/hello", method = RequestType.GET)
-    public String hello(@RequestBody A a) {
+    public String hello(@RequestBody String a) {
         return "get, world! " + a.toString();
     }
 
