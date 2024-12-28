@@ -19,7 +19,7 @@ public class JSON {
     }
 
     private static String resolveName(Field field) {
-        if (field.getClass().isAnnotationPresent(JsonValue.class)) {
+        if (field.isAnnotationPresent(JsonValue.class)) {
             JsonValue annotation = field.getAnnotation(JsonValue.class);
             return annotation.value();
         }
@@ -119,7 +119,8 @@ public class JSON {
 
     private static <T> void setField(String key, String value, T instance) {
         try {
-            Field field = instance.getClass().getDeclaredField(key);
+            Field field = resolveField(instance, key);
+
             field.setAccessible(true);
             // Check if field is a collection type
             if (Collection.class.isAssignableFrom(field.getType())) {
@@ -133,13 +134,24 @@ public class JSON {
                 Object parsedValue = parseElement(value, field.getType());
                 field.set(instance, parsedValue);
             }
-        } catch (NoSuchFieldException e) {
-            log.severe("No field " + key + " found in class " + instance.getClass().getName());
-            throw new RuntimeException(e);
         } catch (IllegalAccessException e) {
             log.severe("Illegal access on field " + key + " in class " + instance.getClass().getName());
             throw new RuntimeException(e);
         }
+    }
+
+    private static <T> Field resolveField(T instance, String key) {
+        for (Field field : instance.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
+            if (field.isAnnotationPresent(JsonValue.class)) {
+                if (field.getAnnotation(JsonValue.class).value().equals(key)) {
+                   return field;
+                }
+            } else if (field.getName().equals(key)) {
+                return field;
+            }
+        }
+        return null;
     }
 
     private static <T> T parseElement(String element, Class<?> elementType) {
