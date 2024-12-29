@@ -5,9 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.example.framework.annotations.Controller;
-import org.example.framework.annotations.RequestBody;
-import org.example.framework.annotations.RequestMapping;
+import org.example.framework.annotations.*;
 import org.example.framework.core.IOContainer;
 import org.example.framework.util.Mapper;
 
@@ -84,10 +82,60 @@ public class DispatcherServlet extends HttpServlet {
         for (Parameter param : method.getParameters()) {
             if (param.isAnnotationPresent(RequestBody.class)) {
                 params.add(resolveRequestBody(param, req));
+            } else if (param.isAnnotationPresent(RequestParam.class)) {
+                params.add(resolveRequestParam(param, req));
+            } else if (param.isAnnotationPresent(PathVariable.class)) {
+                params.add(resolverPathVariable(param, req));
             }
         }
         return params;
 
+    }
+
+    private Object resolverPathVariable(Parameter param, HttpServletRequest req) throws ServletException {
+        if (!param.getType().equals(String.class)) {
+            throw new ServletException(String.format("Cannot inject path param for %s is not a string", param.getName()));
+        }
+        String pathVarName = param.getAnnotation(PathVariable.class).name();
+        if (pathVarName.isEmpty()) {
+            pathVarName = param.getName();
+        }
+
+        String[] sourcePathSegments = req.getRequestURI().split("/");
+        String targetPath = Endpoint.get(endpoints, Mapper.stringToRequestType(req.getMethod()), req.getRequestURI()).get().getPath();
+        String[] targetSegments = targetPath.split("/");
+        if (sourcePathSegments.length != targetSegments.length) {
+            //should never happen but anyways
+            throw new ServletException("Cannot resolve path variable, request uri doesnt match");
+        }
+
+        for (int i = 0; i < targetSegments.length; i++) {
+            String seg = targetSegments[i];
+            if (seg.startsWith("{") && seg.endsWith("}")) {
+                String currentPathVar = seg.substring(1, seg.length() - 1);
+                if (currentPathVar.equals(pathVarName)) {
+                    String element = sourcePathSegments[i];
+                    Optional<Object> o = Mapper.mapStringToType(element, param.getType());
+                    if (o.isEmpty()) {
+                        throw new ServletException(String.format("Cannot map path variable %s with value %s to type %s", currentPathVar, req.getRequestURI(), param.getType().getName()));
+                    }
+                }
+            }
+        }
+        throw new ServletException();
+
+    }
+
+    private String resolveRequestParam(Parameter param, HttpServletRequest req) throws ServletException {
+        if (!param.getType().equals(String.class)) {
+            throw new ServletException(String.format("Cannot inject path param for %s is not a string", param.getName()));
+        }
+        String paramName = param.getAnnotation(RequestParam.class).name();
+        String parameter = req.getParameter(paramName);
+        if (parameter == null) {
+            throw new ServletException("Cannot find parameter " + paramName);
+        }
+        return parameter;
     }
 
     private Object resolveRequestBody(Parameter param, HttpServletRequest req) throws ServletException {
