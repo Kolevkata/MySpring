@@ -93,9 +93,6 @@ public class DispatcherServlet extends HttpServlet {
     }
 
     private Object resolverPathVariable(Parameter param, HttpServletRequest req) throws ServletException {
-        if (!param.getType().equals(String.class)) {
-            throw new ServletException(String.format("Cannot inject path param for %s is not a string", param.getName()));
-        }
         String pathVarName = param.getAnnotation(PathVariable.class).name();
         if (pathVarName.isEmpty()) {
             pathVarName = param.getName();
@@ -117,8 +114,9 @@ public class DispatcherServlet extends HttpServlet {
                     String element = sourcePathSegments[i];
                     Optional<Object> o = Mapper.mapStringToType(element, param.getType());
                     if (o.isEmpty()) {
-                        throw new ServletException(String.format("Cannot map path variable %s with value %s to type %s", currentPathVar, req.getRequestURI(), param.getType().getName()));
+                        throw new ServletException(String.format("Cannot map path variable %s with value %s to type %s", element, req.getRequestURI(), param.getType().getName()));
                     }
+                    return o.get();
                 }
             }
         }
@@ -126,16 +124,17 @@ public class DispatcherServlet extends HttpServlet {
 
     }
 
-    private String resolveRequestParam(Parameter param, HttpServletRequest req) throws ServletException {
-        if (!param.getType().equals(String.class)) {
-            throw new ServletException(String.format("Cannot inject path param for %s is not a string", param.getName()));
-        }
+    private Object resolveRequestParam(Parameter param, HttpServletRequest req) throws ServletException {
         String paramName = param.getAnnotation(RequestParam.class).name();
-        String parameter = req.getParameter(paramName);
-        if (parameter == null) {
-            throw new ServletException("Cannot find parameter " + paramName);
+        if (paramName.equals("")) {
+            paramName = param.getName();
         }
-        return parameter;
+        String parameter = req.getParameter(paramName);
+        Optional<Object> o = Mapper.mapStringToType(parameter, param.getType());
+        if (o.isEmpty()) {
+            throw new ServletException(String.format("Cannot map req param %s with value %s to type %s", paramName, req.getRequestURI(), param.getType().getName()));
+        }
+        return o.get();
     }
 
     private Object resolveRequestBody(Parameter param, HttpServletRequest req) throws ServletException {

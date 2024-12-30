@@ -2,6 +2,8 @@ package org.example.framework.util;
 
 import org.example.framework.web.RequestType;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,8 +29,14 @@ public class Mapper {
             return Optional.of((T) element.replaceAll("\"", "")); // Remove quotes from String
         } else if (target == Integer.class || target == int.class) {
             return Optional.of((T) Integer.valueOf(element)); // Parse Integer
+        } else if (target == Long.class || target == long.class) {
+            return Optional.of((T) Long.valueOf(element)); // Parse Integer
         } else if (target == Double.class || target == double.class) {
             return Optional.of((T) Double.valueOf(element)); // Parse Double
+        } else if (target == BigInteger.class) {
+            return Optional.of((T) BigInteger.valueOf(Long.valueOf(element))); // Parse BigInt
+        } else if (target == BigDecimal.class) {
+            return Optional.of((T) BigDecimal.valueOf(Double.valueOf(element))); // Parse BigDecimal
         } else if (target == Boolean.class || target == boolean.class) {
             return Optional.of((T) Boolean.valueOf(element)); // Parse Boolean
         } else if (target == LocalDate.class) {
