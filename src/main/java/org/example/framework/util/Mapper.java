@@ -79,5 +79,4 @@ public class Mapper {
             throw new IllegalArgumentException("Failed to parse date: " + value, e);
         }
     }
-
 }
