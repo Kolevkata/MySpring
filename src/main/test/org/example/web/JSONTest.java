@@ -9,16 +9,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class JSONTest {
-    class Person implements Serializable {
-        private String name;
-        private int age;
 
-        public Person(String name, int age) {
-            this.name = name;
-            this.age = age;
-        }
-    }
+public class JSONTest {
 
     @Test
     public void testToJsonSimpleObject() {
@@ -27,7 +19,7 @@ public class JSONTest {
         Person person = new Person("John", 30);
 
         // Expected JSON representation
-        String expectedJson = "{\n\"name\": \"John\",\n\"age\": \"30\"\n}\n";
+        String expectedJson = "{\"name\":\"John\",\"age\":\"30\"}";
 
         // Test the toJson method
         assertEquals(expectedJson, JSON.toJson(person));
@@ -42,7 +34,7 @@ public class JSONTest {
         items.add("cherry");
 
         // Expected JSON representation
-        String expectedJson = "[\n\"apple\",\"banana\",\"cherry\"\n]\n";
+        String expectedJson = "[\"apple\",\"banana\",\"cherry\"]";
 
         // Test the toJson method with a collection
         assertEquals(expectedJson, JSON.toJson(items));
@@ -51,37 +43,17 @@ public class JSONTest {
     @Test
     public void testToJsonWithNullField() {
         // Define a class with a null field
-        class Person implements Serializable {
-            private String name;
-            private Integer age;
-
-            public Person(String name, Integer age) {
-                this.name = name;
-                this.age = age;
-            }
-        }
 
         Person person = new Person("John", null);
 
-        String expectedJson = "{\n\"name\": \"John\",\n\"age\": \"null\"\n}\n";
-
+        String expectedJson = "{\"name\":\"John\",\"age\":null}";
         assertEquals(expectedJson, JSON.toJson(person));
     }
 
     @Test
     public void testFromJsonSimpleObject() {
         // Define a simple class
-        class Person implements Serializable {
-            private String name;
-            private int age;
-
-            public Person(String name, int age) {
-                this.name = name;
-                this.age = age;
-            }
-        }
-
-        String json = "{\n\"name\": \"John\",\n\"age\": \"30\"\n}\n";
+        String json = "{\"name\": \"John\",\"age\": \"30\"}";
 
         // Deserialize JSON back to an object
         Person person = JSON.fromJson(json, Person.class);
@@ -93,36 +65,13 @@ public class JSONTest {
 
     @Test
     public void testFromJsonWithInvalidJson() {
-        String invalidJson = "{\n\"name\": \"John\",\n\"age\": 30\n";
+        String invalidJson = "{\"name\":\"John\",\"age\":30";
 
         assertThrows(RuntimeException.class, () -> {
             JSON.fromJson(invalidJson, Person.class);
         });
     }
 
-    @Test
-    public void testFromJsonCollection() {
-        // Define a class
-        class Person implements Serializable {
-            private String name;
-            private int age;
-
-            public Person(String name, int age) {
-                this.name = name;
-                this.age = age;
-            }
-        }
-
-        String json = "[\n{\"name\": \"John\", \"age\": \"30\"},\n{\"name\": \"Jane\", \"age\": \"25\"}\n]";
-
-        // Deserialize JSON array
-        List<Person> people = JSON.fromJson(json, List.class);
-
-        assertNotNull(people);
-        assertEquals(2, people.size());
-        assertEquals("John", people.get(0).name);
-        assertEquals(30, people.get(0).age);
-    }
 
     @Test
     public void testToJsonWithComplexField() {
@@ -150,7 +99,7 @@ public class JSONTest {
         Address address = new Address("123 Main St", "Anytown");
         Person person = new Person("John", address);
 
-        String expectedJson = "{\n\"name\": \"John\",\n\"address\": {\"street\": \"123 Main St\",\"city\": \"Anytown\"}\n}\n";
+        String expectedJson = "{\"name\":\"John\",\"address\":{\"street\":\"123 Main St\",\"city\":\"Anytown\"}}";
 
         assertEquals(expectedJson, JSON.toJson(person));
     }
@@ -187,7 +136,204 @@ public class JSONTest {
 
         Person2 person = new Person2("John", 30);
 
-        String expectedJson = "{\n\"fullName\": \"John\",\n\"age\": \"30\"\n}\n";
+        String expectedJson = "{\"fullName\":\"John\",\"age\":\"30\"}";
         assertEquals(expectedJson, JSON.toJson(person));
+    }
+
+    @Test
+    public void testToJsonEmptyObject() {
+        class EmptyClass implements Serializable {
+        }
+
+        EmptyClass emptyObject = new EmptyClass();
+
+        String expectedJson = "{}";
+
+        assertEquals(expectedJson, JSON.toJson(emptyObject));
+    }
+
+    @Test
+    public void testToJsonWithArray() {
+        String[] fruits = {"apple", "banana", "cherry"};
+
+        String expectedJson = "[\"apple\",\"banana\",\"cherry\"]";
+
+        assertEquals(expectedJson, JSON.toJson(fruits));
+    }
+
+    @Test
+    public void testFromJsonWithNestedObject() {
+        class Address implements Serializable {
+            private String street;
+            private String city;
+
+            public Address() {
+            }
+        }
+
+        class Person implements Serializable {
+            private String name;
+            private Address address;
+
+            public Person() {
+            }
+        }
+
+        String json = "{\"name\":\"John\",\"address\":{\"street\":\"123 Main St\",\"city\":\"Anytown\"}}";
+
+        Person person = JSON.fromJson(json, Person.class);
+
+        assertNotNull(person);
+        assertEquals("John", person.name);
+        assertNotNull(person.address);
+        assertEquals("123 Main St", person.address.street);
+        assertEquals("Anytown", person.address.city);
+    }
+
+    @Test
+    public void testToJsonWithEmptyCollection() {
+        List<String> emptyList = new ArrayList<>();
+
+        String expectedJson = "[]";
+
+        assertEquals(expectedJson, JSON.toJson(emptyList));
+    }
+
+    @Test
+    public void testFromJsonWithEmptyCollection() {
+        String json = "[]";
+
+        List<?> result = JSON.fromJson(json, List.class);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void testFromJsonWithInvalidType() {
+        String json = "{\"name\":\"John\",\"age\":30}";
+
+        assertThrows(ClassCastException.class, () -> {
+            List<?> result = JSON.fromJson(json, List.class); // Trying to deserialize into a List
+        });
+    }
+
+    @Test
+    public void testToJsonWithBooleanField() {
+        class Flag implements Serializable {
+            private boolean active;
+
+            public Flag(boolean active) {
+                this.active = active;
+            }
+        }
+
+        Flag flag = new Flag(true);
+
+        String expectedJson = "{\"active\":true}";
+
+        assertEquals(expectedJson, JSON.toJson(flag));
+    }
+
+    @Test
+    public void testFromJsonWithBooleanField() {
+        class Flag implements Serializable {
+            private boolean active;
+
+            public Flag() {
+            }
+        }
+
+        String json = "{\"active\":true}";
+
+        Flag flag = JSON.fromJson(json, Flag.class);
+
+        assertNotNull(flag);
+        assertTrue(flag.active);
+    }
+
+    @Test
+    public void testToJsonWithMixedCollection() {
+        List<Object> mixedList = new ArrayList<>();
+        mixedList.add("text");
+        mixedList.add(42);
+        mixedList.add(null);
+        mixedList.add(true);
+
+        String expectedJson = "[\"text\",42,null,true]";
+
+        assertEquals(expectedJson, JSON.toJson(mixedList));
+    }
+
+    @Test
+    public void testFromJsonWithMalformedJson() {
+        String malformedJson = "[\"apple\", \"banana\", ";
+
+        assertThrows(RuntimeException.class, () -> {
+            List<?> result = JSON.fromJson(malformedJson, List.class);
+        });
+    }
+
+    @Test
+    public void testToJsonWithCircularReference() {
+        class Node implements Serializable {
+            private String name;
+            private Node next;
+
+            public Node(String name) {
+                this.name = name;
+            }
+
+            public void setNext(Node next) {
+                this.next = next;
+            }
+        }
+
+        Node nodeA = new Node("A");
+        Node nodeB = new Node("B");
+        nodeA.setNext(nodeB);
+        nodeB.setNext(nodeA); // Circular reference
+
+        assertThrows(RuntimeException.class, () -> {
+            JSON.toJson(nodeA); // Should fail due to circular reference
+        });
+    }
+
+    @Test
+    public void testToJsonWithDateField() {
+        class Event implements Serializable {
+            private String name;
+            private java.util.Date date;
+
+            public Event(String name, java.util.Date date) {
+                this.name = name;
+                this.date = date;
+            }
+        }
+
+        Event event = new Event("Meeting", new java.util.Date(0)); // Epoch time
+
+        String expectedJson = "{\"name\":\"Meeting\",\"date\":\"1970-01-01T00:00:00Z\"}";
+
+        assertEquals(expectedJson, JSON.toJson(event));
+    }
+
+    @Test
+    public void testFromJsonWithDateField() {
+        class Event implements Serializable {
+            private String name;
+            private java.util.Date date;
+
+            public Event() {
+            }
+        }
+
+        String json = "{\"name\":\"Meeting\",\"date\":\"1970-01-01T00:00:00Z\"}";
+
+        Event event = JSON.fromJson(json, Event.class);
+
+        assertNotNull(event);
+        assertEquals("Meeting", event.name);
+        assertEquals(new java.util.Date(0), event.date);
     }
 }

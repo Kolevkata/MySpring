@@ -24,30 +24,30 @@ public class Mapper {
 
     }
 
-    public static <T> Optional<T> mapStringToType(String element, Class<?> target) {
-        if (target == String.class) {
-            return Optional.of((T) element.replaceAll("\"", "")); // Remove quotes from String
-        } else if (target == Integer.class || target == int.class) {
-            return Optional.of((T) Integer.valueOf(element)); // Parse Integer
-        } else if (target == Long.class || target == long.class) {
-            return Optional.of((T) Long.valueOf(element)); // Parse Integer
-        } else if (target == Double.class || target == double.class) {
-            return Optional.of((T) Double.valueOf(element)); // Parse Double
-        } else if (target == BigInteger.class) {
-            return Optional.of((T) BigInteger.valueOf(Long.valueOf(element))); // Parse BigInt
-        } else if (target == BigDecimal.class) {
-            return Optional.of((T) BigDecimal.valueOf(Double.valueOf(element))); // Parse BigDecimal
-        } else if (target == Boolean.class || target == boolean.class) {
-            return Optional.of((T) Boolean.valueOf(element)); // Parse Boolean
-        } else if (target == LocalDate.class) {
-            return Optional.of((T) parseLocalDate(element)); // Parse LocalDate
-        } else if (target == LocalDateTime.class) {
-            return Optional.of((T) parseLocalDateTime(element)); // Parse LocalDateTime
-        } else if (target == Date.class) {
-            return Optional.of((T) parseDate(element)); // Parse LocalDateTime
-        }
-        return Optional.empty();
-    }
+//    public static <T> Optional<T> mapStringToType(String element, Class<?> target) {
+//        if (target == String.class) {
+//            return Optional.of((T) element.replaceAll("\"", "")); // Remove quotes from String
+//        } else if (target == Integer.class || target == int.class) {
+//            return Optional.of((T) Integer.valueOf(element)); // Parse Integer
+//        } else if (target == Long.class || target == long.class) {
+//            return Optional.of((T) Long.valueOf(element)); // Parse Integer
+//        } else if (target == Double.class || target == double.class) {
+//            return Optional.of((T) Double.valueOf(element)); // Parse Double
+//        } else if (target == BigInteger.class) {
+//            return Optional.of((T) BigInteger.valueOf(Long.valueOf(element))); // Parse BigInt
+//        } else if (target == BigDecimal.class) {
+//            return Optional.of((T) BigDecimal.valueOf(Double.valueOf(element))); // Parse BigDecimal
+//        } else if (target == Boolean.class || target == boolean.class) {
+//            return Optional.of((T) Boolean.valueOf(element)); // Parse Boolean
+//        } else if (target == LocalDate.class) {
+//            return Optional.of((T) parseLocalDate(element)); // Parse LocalDate
+//        } else if (target == LocalDateTime.class) {
+//            return Optional.of((T) parseLocalDateTime(element)); // Parse LocalDateTime
+//        } else if (target == Date.class) {
+//            return Optional.of((T) parseDate(element)); // Parse LocalDateTime
+//        }
+//        return Optional.empty();
+//    }
 
     private static LocalDate parseLocalDate(String value) {
         try {

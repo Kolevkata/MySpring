@@ -3,11 +3,10 @@ package org.example.framework.web;
 import org.example.framework.annotations.JsonValue;
 import org.example.framework.util.Mapper;
 import org.example.framework.util.StringUtils;
+import org.example.framework.util.TypeConverter;
 
 import java.io.Serializable;
 import java.lang.reflect.*;
-import java.text.SimpleDateFormat;
-import java.time.temporal.Temporal;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -33,86 +32,95 @@ public class JSON {
 
         StringBuilder out = new StringBuilder();
         if (obj instanceof Iterable<?> iterable) {
-            out.append("[\n");
+            out.append("[");
             List<String> subjsons = new ArrayList<>();
             for (Object o : iterable) {
-                subjsons.add(toJson(o));
+                Optional<String> converted = TypeConverter.convert(o, String.class);
+                if (converted.isPresent()) {
+                    subjsons.add("\"" + converted.get() + "\"");
+                } else {
+                    subjsons.add(toJson(o));
+                }
             }
             String join = String.join(",", subjsons);
             out.append(join);
-            out.append("]\n");
+            out.append("]");
         } else {
-            out.append("{\n");
-            Field[] fields = obj.getClass().getDeclaredFields();
-            for (int i = 0; i < fields.length; i++) {
-                Field field = fields[i];
+            out.append("{");
+            List<Field> fields = Arrays.stream(obj.getClass().getDeclaredFields()).filter(field -> !field.isSynthetic()).toList();
+            for (int i = 0; i < fields.size(); i++) {
+                Field field = fields.get(i);
                 field.setAccessible(true);
-                //craete an instance of the field
                 try {
                     Object fieldInstance = field.get(obj);
                     String fieldName = resolveName(field);
-                    String stringFomat = "\"" + fieldName + "\": \"%s\"";
-                    //if its the last field omit the ","
-                    if (i != fields.length - 1) {
-                        stringFomat += ",\n";
-                    } else {
-                        stringFomat += "\n";
-                    }
-                    switch (fieldInstance) {
-                        case null -> out.append(String.format(stringFomat, "null"));
-                        case Number number -> out.append(String.format(stringFomat, number.toString()));
-                        case CharSequence charSequence -> out.append(String.format(stringFomat, charSequence));
-                        case Temporal date -> out.append(String.format(stringFomat, date.toString()));
-                        case Date date -> {
-                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                            out.append(String.format(sdf.format(date)));
-                        }
-                        default -> out.append(String.format("\"%s\": %s", fieldName, JSON.toJson(fieldInstance)));
+                    out.append(resolveFieldToJSONString(fieldInstance, fieldName));
+                    field.setAccessible(true);
+                    if (i != fields.size() - 1) {
+                        out.append(",");
                     }
                 } catch (IllegalAccessException e) {
                     log.severe("field " + field.getName() + " not found");
                     e.printStackTrace();
                 }
             }
-            out.append("}\n");
+            out.append("}");
         }
         return out.toString();
     }
 
 
+    private static String resolveFieldToJSONString(Object fieldInstance, String fieldName) {
+        String stringFomat;
+        if (fieldInstance == null) {
+            stringFomat = "\"" + fieldName + "\":%s";
+            return String.format(stringFomat, "null");
+        }
+        Optional<String> converted = TypeConverter.convert(fieldInstance, String.class);
+        if (converted.isPresent()) {
+            stringFomat = "\"" + fieldName + "\":\"%s\"";
+            return String.format(stringFomat, converted.get());
+        } else {
+            stringFomat = "\"" + fieldName + "\":%s";
+            return String.format(stringFomat, JSON.toJson(fieldInstance));
+        }
+    }
+
+
     public static <T> T fromJson(String json, Class<T> classOfT) {
-//        if (!Arrays.stream(classOfT.getInterfaces()).anyMatch(aClass -> aClass.equals(Serializable.class))) {
-//            log.severe("class" + classOfT.getName() + " is not Serializable");
-//            throw new RuntimeException("Not serializable");
-//        }
         StringBuffer sb = new StringBuffer(StringUtils.removeWhiteSpace(json));
 
         T instance;
+        if (!((sb.charAt(0) == '{' && sb.charAt(sb.length() - 1) == '}') ||
+                (sb.charAt(0) == '[' && sb.charAt(sb.length() - 1) == ']'))) {
+            throw new RuntimeException("Invalid json string");
+        }
+        sb.deleteCharAt(0);
+        sb.deleteCharAt(sb.length() - 1);
+        String[] pairs = StringUtils.splitPreservingQuotesAndBrackets(sb.toString(), ',');
         try {
+            if (Collection.class.isAssignableFrom(classOfT)) {
+                throw new RuntimeException("Cannot map directly to collection, wrap collection in type token");
+            }
+
             Constructor<T> declaredConstructor = classOfT.getDeclaredConstructor();
             declaredConstructor.setAccessible(true);
             instance = declaredConstructor.newInstance();
+            for (String pair : pairs) {
+                setField(pair, instance);
+            }
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
                  NoSuchMethodException e) {
             log.severe("constructor not found for class " + classOfT.getName());
             throw new RuntimeException(e);
         }
-
-        sb.deleteCharAt(0);
-        sb.deleteCharAt(sb.length() - 1);
-        for (String pair : StringUtils.splitPreservingQuotesAndBrackets(sb.toString(), ',')) {
-            String[] keyValue = pair.split(":", 2);
-            String key = keyValue[0].trim().replaceAll("\"", ""); // Remove quotes
-            String value = keyValue[1].trim().replaceAll("\"", "");
-            System.out.println(String.format("Key: %s, Value: %s", key, value));
-            // Find the corresponding field in the class
-            setField(key, value, instance);
-        }
-
         return instance;
     }
 
-    private static <T> void setField(String key, String value, T instance) {
+    private static <T> void setField(String fieldValueStr, T instance) {
+        String[] keyValue = fieldValueStr.split(":", 2);
+        String key = keyValue[0].trim().replaceAll("\"", ""); // Remove quotes
+        String value = keyValue[1].trim().replaceAll("\"", "");
         try {
             Field field = resolveField(instance, key);
 
@@ -125,18 +133,17 @@ public class JSON {
                 List<?> parsedList = parseJsonArray(value, elementType);
                 field.set(instance, parsedList);
             } else {
-                Object parsedValue = Mapper.mapStringToType(value, instance.getClass()).orElse(fromJson(value, field.getClass()));
-                field.set(instance, parsedValue);
+                Optional<?> parsedValue = TypeConverter.convert(value, field.getType());
+                if (parsedValue.isPresent()) {
+                    field.set(instance, parsedValue.get());
+                } else {
+                    Object o = fromJson(value, field.getType());
+                    field.set(instance, o);
+                }
             }
         } catch (IllegalAccessException e) {
-            log.
-
-                    severe("Illegal access on field " + key + " in class " + instance.getClass().
-
-                            getName());
-            throw new
-
-                    RuntimeException(e);
+            log.severe("Illegal access on field " + key + " in class " + instance.getClass().getName());
+            throw new RuntimeException(e);
         }
     }
 
@@ -164,7 +171,7 @@ public class JSON {
         List<T> list = new ArrayList<>();
 
         for (String element : elements) {
-            T item = (T) Mapper.mapStringToType(element, elementType).get(); // Use the helper method
+            T item = (T) TypeConverter.convert(element, elementType).get();
             list.add(item);
         }
 

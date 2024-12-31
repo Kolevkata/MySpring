@@ -114,10 +114,11 @@ public class TypeConverter {
      * @return An Optional containing the converted value, or empty if conversion fails
      */
     @SuppressWarnings("unchecked")
-    public static <S, T> Optional<T> convert(S value, Class<S> sourceType, Class<T> targetType) {
+    public static <S, T> Optional<T> convert(S value, Class<T> targetType) {
         if (value == null) {
             return Optional.empty();
         }
+        Class<?> sourceType = value.getClass();
 
         // If source and target are the same, just cast
         if (sourceType.equals(targetType)) {
@@ -179,4 +180,5 @@ public class TypeConverter {
     public static <T> void registerToStringConverter(Class<T> clazz, Function<T, String> converter) {
         TO_STRING_CONVERTERS.put(clazz, (Function<?, String>) converter);
     }
+
 }

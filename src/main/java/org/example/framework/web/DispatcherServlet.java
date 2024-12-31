@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.example.framework.annotations.*;
 import org.example.framework.core.IOContainer;
 import org.example.framework.util.Mapper;
+import org.example.framework.util.TypeConverter;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -112,7 +113,7 @@ public class DispatcherServlet extends HttpServlet {
                 String currentPathVar = seg.substring(1, seg.length() - 1);
                 if (currentPathVar.equals(pathVarName)) {
                     String element = sourcePathSegments[i];
-                    Optional<Object> o = Mapper.mapStringToType(element, param.getType());
+                    Optional<?> o = TypeConverter.convert(element, param.getType());
                     if (o.isEmpty()) {
                         throw new ServletException(String.format("Cannot map path variable %s with value %s to type %s", element, req.getRequestURI(), param.getType().getName()));
                     }
@@ -130,7 +131,7 @@ public class DispatcherServlet extends HttpServlet {
             paramName = param.getName();
         }
         String parameter = req.getParameter(paramName);
-        Optional<Object> o = Mapper.mapStringToType(parameter, param.getType());
+        Optional<?> o = TypeConverter.convert(parameter, param.getType());
         if (o.isEmpty()) {
             throw new ServletException(String.format("Cannot map req param %s with value %s to type %s", paramName, req.getRequestURI(), param.getType().getName()));
         }
