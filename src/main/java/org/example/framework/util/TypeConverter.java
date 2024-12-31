@@ -107,7 +107,6 @@ public class TypeConverter {
      * Converts a value from one type to another using string as an intermediate format if necessary.
      *
      * @param value      The value to convert
-     * @param sourceType The source class type
      * @param targetType The target class type
      * @param <S>        The source type parameter
      * @param <T>        The target type parameter
@@ -179,6 +178,73 @@ public class TypeConverter {
      */
     public static <T> void registerToStringConverter(Class<T> clazz, Function<T, String> converter) {
         TO_STRING_CONVERTERS.put(clazz, (Function<?, String>) converter);
+    }
+
+
+    /**
+     * Converts an object to a JSON-compatible string representation.
+     * If the type should be stringified, it will return a string, otherwise return a default or error value.
+     *
+     * @param value The object to convert.
+     * @return The stringified JSON representation of the object, or null if not applicable.
+     */
+    public static Optional<String> convertJsonStringify(Object value) {
+        if (value == null) {
+            return Optional.of("null"); // Or handle as per your use case, e.g., throw an exception
+        }
+
+        Class<?> type = value.getClass();
+        // If the type has a registered converter in TO_STRING_CONVERTERS
+        if (TypeConverter.TO_STRING_CONVERTERS.containsKey(type)) {
+            // Use the registered converter for the type
+            Function<Object, String> toStringConverter = (Function<Object, String>) TypeConverter.TO_STRING_CONVERTERS.get(type);
+            String result = toStringConverter.apply(value);
+
+            if (shouldWrapInQuotes(value)) {
+                return Optional.of("\"" + result + "\"");
+            } else {
+                return Optional.ofNullable(result);
+            }
+        } else {
+            Optional.empty();
+        }
+
+        // Handle unknown types: Could throw an exception, return null, or a custom string for unknown types
+        return null; // Or throw a custom exception
+    }
+
+    /**
+     * Checks whether the given object's type should be wrapped in quotation marks in JSON.
+     *
+     * @param obj The object to check.
+     * @return true if the type should be wrapped in quotes, false otherwise.
+     */
+    private static boolean shouldWrapInQuotes(Object obj) {
+        if (obj == null) {
+            return false; // null is not wrapped in quotes
+        }
+
+        Class<?> clazz = obj.getClass();
+
+        // Strings, characters, enums, dates, and other "string-convertible" types
+        if (obj instanceof String ||
+                obj instanceof Character ||
+                clazz.isEnum() ||
+                obj instanceof Date ||
+                obj instanceof UUID ||
+                obj instanceof Currency ||
+                obj instanceof Locale ||
+                obj instanceof TimeZone) {
+            return true;
+        }
+
+        // Numbers and booleans are not wrapped in quotes
+        if (obj instanceof Number || obj instanceof Boolean) {
+            return false;
+        }
+
+        // Collections, arrays, and objects are typically serialized without quotes
+        return false;
     }
 
 }

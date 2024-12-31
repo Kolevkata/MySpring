@@ -35,9 +35,9 @@ public class JSON {
             out.append("[");
             List<String> subjsons = new ArrayList<>();
             for (Object o : iterable) {
-                Optional<String> converted = TypeConverter.convert(o, String.class);
+                Optional<String> converted = TypeConverter.convertJsonStringify(o);
                 if (converted.isPresent()) {
-                    subjsons.add("\"" + converted.get() + "\"");
+                    subjsons.add(converted.get());
                 } else {
                     subjsons.add(toJson(o));
                 }
@@ -71,17 +71,15 @@ public class JSON {
 
 
     private static String resolveFieldToJSONString(Object fieldInstance, String fieldName) {
-        String stringFomat;
+        String stringFomat = "\"" + fieldName + "\":%s";
         if (fieldInstance == null) {
             stringFomat = "\"" + fieldName + "\":%s";
             return String.format(stringFomat, "null");
         }
-        Optional<String> converted = TypeConverter.convert(fieldInstance, String.class);
+        Optional<String> converted = TypeConverter.convertJsonStringify(fieldInstance);
         if (converted.isPresent()) {
-            stringFomat = "\"" + fieldName + "\":\"%s\"";
             return String.format(stringFomat, converted.get());
         } else {
-            stringFomat = "\"" + fieldName + "\":%s";
             return String.format(stringFomat, JSON.toJson(fieldInstance));
         }
     }
