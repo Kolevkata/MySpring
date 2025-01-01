@@ -1,4 +1,4 @@
-package org.example.web;
+package org.example.util;
 
 import org.example.framework.annotations.JsonValue;
 import org.example.framework.util.JSON;

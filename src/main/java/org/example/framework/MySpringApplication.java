@@ -12,12 +12,14 @@ import java.util.logging.Logger;
 
 public class MySpringApplication {
     private static final Logger log = Logger.getLogger(MySpringApplication.class.getName());
+    private static Tomcat tomcat;
+    private static Thread serverThread;
 
     public static void start() {
         IOContainer ioc = IOContainer.getInstance();
         log.info("IOC container initialized");
         int port = 8080;
-        Tomcat tomcat = new Tomcat();
+        tomcat = new Tomcat();
         tomcat.setBaseDir("temp");
         tomcat.setPort(port);
         String contextPath = "";
@@ -28,18 +30,33 @@ public class MySpringApplication {
         wrapper.setLoadOnStartup(1);
         context.addServletMappingDecoded("/*", "dispatcher");
 
-// Add connector explicitly
         tomcat.getConnector();
 
         try {
             tomcat.start();
             log.info("Tomcat started successfully on port " + port);
+            serverThread = new Thread(() -> tomcat.getServer().await());
+            serverThread.setDaemon(true);
+            serverThread.start();
         } catch (LifecycleException e) {
             log.severe("Failed to start Tomcat");
             e.printStackTrace();
-            return;
         }
+    }
 
-        tomcat.getServer().await();
+    public static void shutdown() {
+        if (tomcat != null) {
+            try {
+                tomcat.stop();
+                tomcat.destroy();
+                if (serverThread != null) {
+                    serverThread.interrupt();
+                }
+                log.info("Tomcat shutdown completed");
+            } catch (LifecycleException e) {
+                log.severe("Failed to shutdown Tomcat");
+                e.printStackTrace();
+            }
+        }
     }
 }

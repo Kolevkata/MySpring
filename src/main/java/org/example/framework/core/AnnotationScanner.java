@@ -1,16 +1,21 @@
 package org.example.framework.core;
 
+import org.example.framework.MySpringApplication;
+
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 public class AnnotationScanner {
+    private static final Logger log = Logger.getLogger(AnnotationScanner.class.getName());
+
     private static List<Class<?>> scanForAnnotation(String packageName, Class<? extends Annotation> annotation) {
         List<Class<?>> annotatedClasses = new ArrayList<>();
         String path = packageName.replace(".", "/");
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        ClassLoader classLoader = ClassLoader.getSystemClassLoader();
         URL resource = classLoader.getResource(path);
         if (resource == null) {
             throw new IllegalArgumentException("Resource not found");
@@ -33,6 +38,8 @@ public class AnnotationScanner {
                     }
                 }
             }
+        } else {
+            log.severe("dir " + directory.getName() + " not found");
         }
         return annotatedClasses;
     }

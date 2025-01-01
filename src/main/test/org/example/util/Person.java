@@ -1,4 +1,4 @@
-package org.example.web;
+package org.example.util;
 
 import java.io.Serializable;
 
