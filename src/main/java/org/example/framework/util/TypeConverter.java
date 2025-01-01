@@ -206,11 +206,8 @@ public class TypeConverter {
                 return Optional.ofNullable(result);
             }
         } else {
-            Optional.empty();
+            return Optional.empty();
         }
-
-        // Handle unknown types: Could throw an exception, return null, or a custom string for unknown types
-        return null; // Or throw a custom exception
     }
 
     /**
@@ -246,5 +243,4 @@ public class TypeConverter {
         // Collections, arrays, and objects are typically serialized without quotes
         return false;
     }
-
 }

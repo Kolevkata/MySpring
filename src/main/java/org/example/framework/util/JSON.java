@@ -1,9 +1,6 @@
-package org.example.framework.web;
+package org.example.framework.util;
 
 import org.example.framework.annotations.JsonValue;
-import org.example.framework.util.Mapper;
-import org.example.framework.util.StringUtils;
-import org.example.framework.util.TypeConverter;
 
 import java.io.Serializable;
 import java.lang.reflect.*;
@@ -31,19 +28,35 @@ public class JSON {
         }
 
         StringBuilder out = new StringBuilder();
-        if (obj instanceof Iterable<?> iterable) {
+        if (obj instanceof Iterable<?> || obj.getClass().isArray()) {
             out.append("[");
-            List<String> subjsons = new ArrayList<>();
-            for (Object o : iterable) {
-                Optional<String> converted = TypeConverter.convertJsonStringify(o);
-                if (converted.isPresent()) {
-                    subjsons.add(converted.get());
-                } else {
-                    subjsons.add(toJson(o));
+
+            // Check if the object is an Iterable or an array
+            if (obj instanceof Iterable<?>) {
+                // Process Iterable
+                Iterator<?> iterator = ((Iterable<?>) obj).iterator();
+                while (iterator.hasNext()) {
+                    Object element = iterator.next();
+                    Optional<String> converted = TypeConverter.convertJsonStringify(element);
+                    out.append(converted.orElseGet(() -> toJson(element)));
+                    out.append(",");
+                }
+            } else {
+                // Process Array
+                int length = Array.getLength(obj);
+                for (int i = 0; i < length; i++) {
+                    Object element = Array.get(obj, i);
+                    Optional<String> converted = TypeConverter.convertJsonStringify(element);
+                    out.append(converted.orElseGet(() -> toJson(element)));
+                    out.append(",");
                 }
             }
-            String join = String.join(",", subjsons);
-            out.append(join);
+
+            // Remove the last comma (if any)
+            if (out.charAt(out.length() - 1) == ',') {
+                out.setLength(out.length() - 1);
+            }
+
             out.append("]");
         } else {
             out.append("{");
@@ -85,12 +98,17 @@ public class JSON {
     }
 
 
+    private static boolean isJsonObj(String str) {
+        return (str.charAt(0) == '{' && str.charAt(str.length() - 1) == '}') ||
+                (str.charAt(0) == '[' && str.charAt(str.length() - 1) == ']');
+
+    }
+
     public static <T> T fromJson(String json, Class<T> classOfT) {
         StringBuffer sb = new StringBuffer(StringUtils.removeWhiteSpace(json));
 
         T instance;
-        if (!((sb.charAt(0) == '{' && sb.charAt(sb.length() - 1) == '}') ||
-                (sb.charAt(0) == '[' && sb.charAt(sb.length() - 1) == ']'))) {
+        if (!isJsonObj(sb.toString())) {
             throw new RuntimeException("Invalid json string");
         }
         sb.deleteCharAt(0);
@@ -118,7 +136,9 @@ public class JSON {
     private static <T> void setField(String fieldValueStr, T instance) {
         String[] keyValue = fieldValueStr.split(":", 2);
         String key = keyValue[0].trim().replaceAll("\"", ""); // Remove quotes
-        String value = keyValue[1].trim().replaceAll("\"", "");
+        String value = isJsonObj(keyValue[1]) ?
+                keyValue[1] :
+                keyValue[1].trim().replaceAll("\"", "");
         try {
             Field field = resolveField(instance, key);
 
