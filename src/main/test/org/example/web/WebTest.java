@@ -5,6 +5,7 @@ import io.restassured.http.ContentType;
 import org.example.app.dto.A;
 import org.example.app.dto.B;
 import org.example.framework.MySpringApplication;
+import org.example.framework.util.JSON;
 import org.junit.jupiter.api.*;
 
 import java.net.URL;
@@ -86,7 +87,7 @@ public class WebTest {
         B b = new B("test", 789);
         given()
                 .contentType(ContentType.JSON)
-                .body(b)
+                .body(JSON.toJson(b))
                 .when()
                 .post("/testSimpleJSON")
                 .then()
@@ -100,7 +101,7 @@ public class WebTest {
         B b = new B("test", 789);
         given()
                 .contentType(ContentType.JSON)
-                .body(b)
+                .body(JSON.toJson(b))
                 .queryParam("idx", 101)
                 .when()
                 .post("/testSimpleJSONWithParam")
@@ -116,7 +117,7 @@ public class WebTest {
         A a = new A("testA", 123);
         given()
                 .contentType(ContentType.JSON)
-                .body(a)
+                .body(JSON.toJson(a))
                 .when()
                 .post("/testCompleteJSON")
                 .then()
