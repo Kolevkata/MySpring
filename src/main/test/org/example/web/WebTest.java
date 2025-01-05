@@ -5,22 +5,15 @@ import io.restassured.http.ContentType;
 import org.example.app.dto.A;
 import org.example.app.dto.B;
 import org.example.framework.MySpringApplication;
-import org.example.framework.annotations.RequestBody;
-import org.example.framework.annotations.RequestMapping;
 import org.example.framework.util.JSON;
-import org.example.framework.web.RequestType;
+import org.example.framework.util.TypeConverter;
 import org.junit.jupiter.api.*;
 
-import java.net.URL;
-import java.net.URLClassLoader;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import static io.restassured.RestAssured.*;
-import static io.restassured.matcher.RestAssuredMatchers.*;
 import static org.hamcrest.Matchers.*;
 
 public class WebTest {
@@ -153,7 +146,7 @@ public class WebTest {
                 .contentType(ContentType.JSON)
                 .body("value", equalTo("this is object A")) // Match the "value" field
                 .body("fieldA2", equalTo(42)) // Match "fieldA2"
-                .body("date", equalTo("2025-01-03")) // Match "date" if relevant
+                .body("date", equalTo(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))) // Match "date" if relevant
                 .body("listOfB.size()", equalTo(2)) // Verify size of "listOfB"
                 .body("listOfB[0].fieldB1", equalTo("this is b1")) // Verify first element in "listOfB"
                 .body("listOfB[0].fieldB2", equalTo(11)) // Verify first element's fieldB2
