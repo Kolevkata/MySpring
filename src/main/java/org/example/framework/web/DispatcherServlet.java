@@ -5,33 +5,34 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.example.framework.annotations.*;
 import org.example.framework.core.IOContainer;
-import org.example.framework.util.JSON;
-import org.example.framework.util.Mapper;
-import org.example.framework.util.TypeConverter;
+import org.example.framework.core.annotations.Component;
+import org.example.framework.core.annotations.Configuration;
+import org.example.framework.core.annotations.Inject;
+import org.example.framework.security.session.SessionService;
+import org.example.framework.security.user.UserDetails;
+import org.example.framework.util.*;
+import org.example.framework.web.annotations.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.lang.reflect.*;
+import java.util.*;
 import java.util.logging.Logger;
 
+@Component
 public class DispatcherServlet extends HttpServlet {
     private static final Logger log = Logger.getLogger(DispatcherServlet.class.getName());
     //request mapping to method
     List<Endpoint> endpoints = new ArrayList<>();
     //method wto controller instance
 
+    @Inject
+    SessionService sessionService;
+
     @Override
-    public void init(ServletConfig config) throws ServletException {
+    public void init(ServletConfig config) {
         Map<String, Object> beans = IOContainer.getInstance().getBeans();
         for (Map.Entry<String, Object> entry : beans.entrySet()) {
             Object instance = entry.getValue();
@@ -49,7 +50,7 @@ public class DispatcherServlet extends HttpServlet {
     }
 
     @Override
-    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String path = req.getRequestURI();
         RequestType requestType = Mapper.stringToRequestType(req.getMethod());
         Optional<Endpoint> endpoint = Endpoint.get(endpoints, requestType, path);
@@ -62,12 +63,34 @@ public class DispatcherServlet extends HttpServlet {
                 Object controller = ioc.getBean(endpoint.get().getController());
                 Method method = endpoint.get().getMethod();
 
-                List<Object> params = InjectParameters(method, req);
+                List<Object> params = injectParameters(method, req, resp);
 
                 Object result = method.invoke(controller, params.toArray());
 
-                resp.setContentType("text/plain");
-                resp.getWriter().write(result.toString());
+                if (result instanceof ResponseEntity<?> responseEntity) {
+                    Object body = responseEntity.getBody();
+                    if (body == null) {
+                        resp.setStatus(responseEntity.getStatus());
+                        return;
+                    }
+                    Optional<String> converted = TypeConverter.convert(body, String.class);
+                    if (converted.isPresent()) {
+                        resp.setStatus(responseEntity.getStatus());
+                        resp.getWriter().write(converted.get());
+                    } else {
+                        resp.setContentType("application/json");
+                        String json = "";
+                        if (body != null) {
+                            json = JSON.toJson(body);
+                        }
+                        resp.setStatus(responseEntity.getStatus());
+                        resp.getWriter().write(json);
+                    }
+                } else if (result instanceof String) {
+                    resp.setContentType("text/plain");
+                    resp.getWriter().write(result.toString());
+                }
+
             } catch (Exception e) {
                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 PrintWriter writer = resp.getWriter();
@@ -79,7 +102,7 @@ public class DispatcherServlet extends HttpServlet {
         }
     }
 
-    private List<Object> InjectParameters(Method method, HttpServletRequest req) throws ServletException {
+    private List<Object> injectParameters(Method method, HttpServletRequest req, HttpServletResponse resp) throws ServletException {
         List<Object> params = new ArrayList<>();
         for (Parameter param : method.getParameters()) {
             if (param.isAnnotationPresent(RequestBody.class)) {
@@ -88,6 +111,17 @@ public class DispatcherServlet extends HttpServlet {
                 params.add(resolveRequestParam(param, req));
             } else if (param.isAnnotationPresent(PathVariable.class)) {
                 params.add(resolverPathVariable(param, req));
+            } else if (param.getType().equals(HttpServletRequest.class)) {
+                params.add(req);
+            } else if (param.getType().equals(HttpServletResponse.class)) {
+                params.add(resp);
+            } else if (param.getType().equals(UserDetails.class)) {
+                params.add(sessionService.getUserDetailsFromSession(req));
+            } else {
+                IOContainer.getInstance().getBeans().values().stream()
+                        .filter(bean -> param.getType().isAssignableFrom(bean.getClass()))
+                        .findFirst()
+                        .ifPresent(params::add);
             }
         }
         return params;
@@ -145,22 +179,63 @@ public class DispatcherServlet extends HttpServlet {
             throw new ServletException("Cannot find content type to reseolve request body");
         }
         try {
-            Constructor<?> constructor = param.getType().getConstructor();
-            constructor.setAccessible(true);
-            Object object = constructor.newInstance();
             String body = getRequestBody(req);
             if (header.equals("application/json")) {
-                Object o = JSON.fromJson(body, param.getType());
+                //arrays and colletions must be handled here because of type amnsia
+                Object o;
+                if (param.getType().isArray()) {
+                    o = handleArray(param, body);
+                } else if (Collection.class.isAssignableFrom(param.getType())) {
+                    o = handleCollection(param, body);
+                } else {
+                    o = JSON.fromJson(body, param.getType());
+                }
                 return o;
             } else if (param.getType().equals(String.class)) {
                 return body;
             }
-        } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException |
-                 IOException e) {
+        } catch (IOException e) {
             log.severe("Encountered error while parsing parameter " + param.getName() + " in met");
             throw new RuntimeException(e);
         }
         return null;
+    }
+
+    private Collection<Object> handleCollection(Parameter param, String body) {
+        if (param.getParameterizedType() instanceof ParameterizedType parameterizedType) {
+            // Check if the parameter is a Collection (or any parameterized type)
+            Type[] typeArgs = parameterizedType.getActualTypeArguments();
+            if (typeArgs.length > 0) {
+                Type typeArg = typeArgs[0];
+                body = StringUtils.removeWhiteSpace(body);
+                body = body.substring(1, body.length() - 1);
+                String[] subJsons = StringUtils.splitPreservingQuotesAndBrackets(body, ',');
+                List<Object> list = new LinkedList<>();
+
+                for (int i = 0; i < subJsons.length; i++) {
+                    String s = subJsons[i];
+                    Object o = JSON.fromJson(s, (Class<?>) typeArg);
+                    list.add(o);
+                }
+                return list;
+            }
+        }
+        log.severe("The parameter is NOT a collection.");
+        return Collections.emptyList();
+    }
+
+    private static Object handleArray(Parameter param, String body) {
+        Class<?> componentType = param.getType().getComponentType();
+        body = StringUtils.removeWhiteSpace(body);
+        body = body.substring(1, body.length() - 1);
+        String[] subJsons = StringUtils.splitPreservingQuotesAndBrackets(body, ',');
+        Object arr = Array.newInstance(componentType, subJsons.length);
+        for (int i = 0; i < subJsons.length; i++) {
+            String s = subJsons[i];
+            Object o = JSON.fromJson(s, componentType);
+            Array.set(arr, i, o);
+        }
+        return arr;
     }
 
     private String getRequestBody(HttpServletRequest req) throws IOException {

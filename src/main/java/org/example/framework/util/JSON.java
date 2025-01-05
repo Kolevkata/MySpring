@@ -1,6 +1,6 @@
 package org.example.framework.util;
 
-import org.example.framework.annotations.JsonValue;
+import org.example.framework.web.annotations.JsonValue;
 
 import java.io.Serializable;
 import java.lang.reflect.*;

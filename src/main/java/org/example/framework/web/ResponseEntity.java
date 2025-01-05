@@ -1,30 +1,19 @@
 package org.example.framework.web;
 
 public class ResponseEntity<T> {
-    private int statusCode;
-    private String responseBody;
+    int status;
+    T body;
 
-    public ResponseEntity(int statusCode) {
-        this.statusCode = statusCode;
+    public ResponseEntity(int status, T body) {
+        this.status = status;
+        this.body = body;
     }
 
-    public ResponseEntity(int statusCode, String responseBody) {
-        this.responseBody = responseBody;
+    public int getStatus() {
+        return status;
     }
 
-    public int getStatusCode() {
-        return statusCode;
-    }
-
-    public void setStatusCode(int statusCode) {
-        this.statusCode = statusCode;
-    }
-
-    public String getResponseBody() {
-        return responseBody;
-    }
-
-    public void setResponseBody(String responseBody) {
-        this.responseBody = responseBody;
+    public T getBody() {
+        return body;
     }
 }

@@ -1,4 +1,4 @@
-package org.example.framework.annotations;
+package org.example.framework.web.annotations;
 
 import org.example.framework.web.RequestType;
 

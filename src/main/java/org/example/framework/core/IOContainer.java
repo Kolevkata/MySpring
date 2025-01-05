@@ -1,14 +1,19 @@
 package org.example.framework.core;
 
-import org.example.framework.annotations.Component;
-import org.example.framework.annotations.Controller;
-import org.example.framework.annotations.Inject;
+import org.example.framework.core.annotations.*;
+import org.example.framework.security.session.HttpSessionService;
+import org.example.framework.security.session.SessionService;
+import org.example.framework.web.annotations.Controller;
 
+import javax.xml.stream.util.XMLEventAllocator;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 
@@ -23,16 +28,41 @@ public class IOContainer {
     private Map<String, Object> beans = new HashMap<>();
 
     private IOContainer() {
-        List<Class<?>> beanClasses = AnnotationScanner.scanForAnnotation(Component.class);
-        beanClasses.addAll(AnnotationScanner.scanForAnnotation(Controller.class));
+        List<Class<?>> beanClasses = AnnotationClassScanner.scanForAnnotation(Component.class);
+        beanClasses.addAll(AnnotationClassScanner.scanForAnnotation(Configuration.class));
+        beanClasses.addAll(AnnotationClassScanner.scanForAnnotation(Service.class));
+        beanClasses.addAll(AnnotationClassScanner.scanForAnnotation(Controller.class));
+        List<Method> beanMethods = MethodScanner.scan("org", Bean.class);
 
         beanClasses.forEach(clazz -> {
             Object instance = createBean(clazz);
             beans.put(clazz.getName(), instance);
         });
 
+        configureDefaults();
+
+        for (Method beanMethod : beanMethods) {
+            Object component = getBean(beanMethod.getDeclaringClass());
+            try {
+                Object bean = beanMethod.invoke(component);
+                beans.put(bean.getClass().getName(), bean);
+                //overwrite interfaces
+                for (Class<?> anInterface : bean.getClass().getInterfaces()) {
+                    beans.put(anInterface.getName(), bean);
+                }
+
+            } catch (InvocationTargetException | IllegalAccessException e) {
+                log.severe("Cannot register bean from method " + beanMethod.getName() + "." + beanMethod.getDeclaringClass().getName() + " is not a registered component");
+                throw new RuntimeException(e);
+            }
+        }
+
         // Inject dependencies
         beans.values().forEach(this::injectFieldDependencies);
+    }
+
+    private void configureDefaults() {
+        beans.put(SessionService.class.getName(), new HttpSessionService());
     }
 
     private void injectFieldDependencies(Object instance) {
@@ -47,6 +77,7 @@ public class IOContainer {
                 try {
                     field.setAccessible(true);
                     field.set(instance, dependency);
+                    System.out.println();
                 } catch (IllegalAccessException e) {
                     log.severe("Failed to inject dependency for field: " + field.getName());
                     e.printStackTrace();

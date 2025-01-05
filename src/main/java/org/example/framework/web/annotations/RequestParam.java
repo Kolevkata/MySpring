@@ -1,6 +1,4 @@
-package org.example.framework.annotations;
-
-import org.example.framework.web.RequestType;
+package org.example.framework.web.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

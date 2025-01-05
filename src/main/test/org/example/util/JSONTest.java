@@ -1,6 +1,6 @@
 package org.example.util;
 
-import org.example.framework.annotations.JsonValue;
+import org.example.framework.web.annotations.JsonValue;
 import org.example.framework.util.JSON;
 import org.junit.jupiter.api.Test;
 

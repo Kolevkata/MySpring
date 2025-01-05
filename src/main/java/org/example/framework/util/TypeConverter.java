@@ -231,6 +231,9 @@ public class TypeConverter {
                 obj instanceof UUID ||
                 obj instanceof Currency ||
                 obj instanceof Locale ||
+                obj instanceof LocalDate ||
+                obj instanceof LocalDateTime ||
+                obj instanceof LocalTime ||
                 obj instanceof TimeZone) {
             return true;
         }

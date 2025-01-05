@@ -1,6 +1,6 @@
 package org.example.app.dto;
 
-import org.example.framework.annotations.JsonValue;
+import org.example.framework.web.annotations.JsonValue;
 
 import java.io.Serializable;
 import java.time.LocalDate;
@@ -12,13 +12,13 @@ public class A implements Serializable {
     private String fieldA1;
     public int fieldA2;
     public LocalDate date;
-    private List<B> b;
+    public List<B> listOfB;
 
     public A(String fieldA1, int fieldA2) {
         this.fieldA1 = fieldA1;
         this.fieldA2 = fieldA2;
         this.date = LocalDate.now();
-        this.b = new ArrayList<>();
+        this.listOfB = new ArrayList<>();
     }
 
     public A() {
@@ -27,7 +27,7 @@ public class A implements Serializable {
     @Override
     public String toString() {
         return "A{" +
-                "b=" + b +
+                "b=" + listOfB +
                 ", date=" + date +
                 ", fieldA2=" + fieldA2 +
                 ", fieldA1='" + fieldA1 + '\'' +
