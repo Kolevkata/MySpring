@@ -2,6 +2,7 @@ package org.example.web;
 
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import org.example.app.dto.A;
 import org.example.app.dto.B;
 import org.example.framework.MySpringApplication;
@@ -197,6 +198,76 @@ public class WebTest {
                 .statusCode(200)
                 .body(containsString("listOfB count: 2"))
                 .body(containsString("array: [B{fieldB1='element1', fieldB2=30},B{fieldB1='element2', fieldB2=40}]"));
+    }
+    @Test
+    public void testSuccessfulLogin() {
+        String requestBody = """
+                {
+                    "username": "testUser",
+                    "password": "123"
+                }
+                """;
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(requestBody)
+                .when()
+                .post("/login")
+                .then()
+                .statusCode(200)
+                .body(equalTo("Login successful"));
+    }
+
+    @Test
+    public void testFailedLogin() {
+        String requestBody = """
+                {
+                    "username": "wrongUser",
+                    "password": "wrongPassword"
+                }
+                """;
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(requestBody)
+                .when()
+                .post("/login")
+                .then()
+                .statusCode(401)
+                .body(equalTo("Login failed"));
+    }
+
+    @Test
+    public void testGetCurrentUser() {
+        // Step 1: Perform Login
+        String loginRequestBody = """
+                {
+                    "username": "testUser",
+                    "password": "123"
+                }
+                """;
+
+        Response loginResponse = given()
+                .contentType(ContentType.JSON)
+                .body(loginRequestBody)
+                .when()
+                .post("/login")
+                .then()
+                .statusCode(200)
+                .extract().response();
+
+        // Step 2: Extract Session or Token from Login Response (if applicable)
+        String sessionId = loginResponse.getHeader("Set-Cookie");
+
+        // Step 3: Access `getCurrentUser` Endpoint
+        given()
+                .contentType(ContentType.JSON)
+                .header("Cookie", sessionId) // Pass the session ID or token
+                .when()
+                .post("/getCurrentUser")
+                .then()
+                .statusCode(200)
+                .body(equalTo("testUser")); // Assuming the user's name is returned
     }
 
     @BeforeAll
