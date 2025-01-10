@@ -13,12 +13,15 @@ public class UserService {
     private SessionService sessionService;
 
     public boolean login(HttpServletRequest request, String username, String password) {
-        if (!password.equals("123")) {
+        if (!password.equals("123") && !password.equals("admin")) {
             return false;
         }
         UserDetails userDetails = new UserDetails();
         userDetails.setName(username);
         userDetails.getAuthorities().add(new Authority("ROLE_USER"));
+        if (password.equals("admin")) {
+            userDetails.getAuthorities().add(new Authority("ROLE_ADMIN"));
+        }
         sessionService.createSession(request, userDetails);
         return true;
     }

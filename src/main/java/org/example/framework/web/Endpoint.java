@@ -1,20 +1,27 @@
 package org.example.framework.web;
 
+import org.example.framework.security.user.Authority;
+
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public class Endpoint {
     private final String path;
     private final Method method;
     private final Class<?> controller;
     private final RequestType requestType;
+    private final Set<Authority> allowedAuthorities;
 
     public Endpoint(Method method, Class<?> controllerClass, RequestType requestType, String path) {
         this.method = method;
         this.requestType = requestType;
         this.path = path;
         this.controller = controllerClass;
+        this.allowedAuthorities = new HashSet<>();
+    }
+
+    public Set<Authority> getAllowedAuthorities() {
+        return allowedAuthorities;
     }
 
     public Method getMethod() {
@@ -33,7 +40,7 @@ public class Endpoint {
         return path;
     }
 
-    public static Optional<Endpoint> get(List<Endpoint> endpoints, RequestType requestType, String path) {
+    public static Optional<Endpoint> get(Set<Endpoint> endpoints, RequestType requestType, String path) {
         return endpoints.stream()
                 .filter(endpoint -> equalsIgnoreInsideBrackets(endpoint.getPath(),path) && endpoint.getRequestType() == requestType)
                 .findFirst();
@@ -71,5 +78,17 @@ public class Endpoint {
 
         // If all segments match or placeholders align, the paths are equal
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Endpoint endpoint = (Endpoint) o;
+        return Objects.equals(path, endpoint.path);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(path);
     }
 }

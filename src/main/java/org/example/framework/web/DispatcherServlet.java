@@ -9,7 +9,9 @@ import org.example.framework.core.IOContainer;
 import org.example.framework.core.annotations.Component;
 import org.example.framework.core.annotations.Configuration;
 import org.example.framework.core.annotations.Inject;
+import org.example.framework.security.annotations.PreAuthorize;
 import org.example.framework.security.session.SessionService;
+import org.example.framework.security.user.Authority;
 import org.example.framework.security.user.UserDetails;
 import org.example.framework.util.*;
 import org.example.framework.web.annotations.*;
@@ -25,7 +27,7 @@ import java.util.logging.Logger;
 public class DispatcherServlet extends HttpServlet {
     private static final Logger log = Logger.getLogger(DispatcherServlet.class.getName());
     //request mapping to method
-    List<Endpoint> endpoints = new ArrayList<>();
+    Set<Endpoint> endpoints = new HashSet<>();
     //method wto controller instance
 
     @Inject
@@ -36,14 +38,28 @@ public class DispatcherServlet extends HttpServlet {
         Map<String, Object> beans = IOContainer.getInstance().getBeans();
         for (Map.Entry<String, Object> entry : beans.entrySet()) {
             Object instance = entry.getValue();
-            if (instance.getClass().isAnnotationPresent(Controller.class)) {
-                for (Method method : instance.getClass().getDeclaredMethods()) {
-                    if (method.isAnnotationPresent(RequestMapping.class)) {
-                        RequestMapping annotation = method.getAnnotation(RequestMapping.class);
-                        log.info("Mapping " + annotation.path() + " to " + method.getName());
-                        Endpoint endpoint = new Endpoint(method, instance.getClass(), annotation.method(), annotation.path());
-                        endpoints.add(endpoint);
+            if (!instance.getClass().isAnnotationPresent(Controller.class)) {
+                continue;
+            }
+            for (Method method : instance.getClass().getDeclaredMethods()) {
+                if (!method.isAnnotationPresent(RequestMapping.class)) {
+                    continue;
+                }
+                RequestMapping annotation = method.getAnnotation(RequestMapping.class);
+                log.info("Mapping " + annotation.path() + " to " + method.getName());
+                Endpoint endpoint = new Endpoint(method, instance.getClass(), annotation.method(), annotation.path());
+
+                if (method.isAnnotationPresent(PreAuthorize.class)) {
+                    PreAuthorize preAuthorize = method.getAnnotation(PreAuthorize.class);
+                    for (String authority : preAuthorize.allowedAuthorities()) {
+                        endpoint.getAllowedAuthorities().add(new Authority(authority));
                     }
+                }
+                if (endpoints.contains(endpoint)) {
+                    log.severe("Duplicate endpoint mapping for " + annotation.path());
+                    throw new RuntimeException("Duplicate endpoint mapping for " + annotation.path());
+                } else {
+                    endpoints.add(endpoint);
                 }
             }
         }
@@ -55,8 +71,28 @@ public class DispatcherServlet extends HttpServlet {
         RequestType requestType = Mapper.stringToRequestType(req.getMethod());
         Optional<Endpoint> endpoint = Endpoint.get(endpoints, requestType, path);
 
+
         if (endpoint.isPresent()) {
             try {
+                UserDetails user = sessionService.getUserDetailsFromSession(req);
+                boolean hasAuthority = false;
+                if (user != null) {
+                    if (endpoint.get().getAllowedAuthorities().isEmpty()) {
+                        hasAuthority = true;
+                    } else {
+                        for (Authority authority : user.getAuthorities()) {
+                            if (endpoint.get().getAllowedAuthorities().contains(authority)) {
+                                hasAuthority = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!hasAuthority) {
+                        resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        return;
+                    }
+                }
+
                 IOContainer ioc = IOContainer.getInstance();
 
                 //get the controller instance from ioc container
@@ -91,14 +127,21 @@ public class DispatcherServlet extends HttpServlet {
                     resp.getWriter().write(result.toString());
                 }
 
-            } catch (Exception e) {
+            } catch (
+                    Exception e) {
                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 PrintWriter writer = resp.getWriter();
                 writer.write("Error: " + e.getMessage());
             }
         } else {
-            resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            resp.getWriter().write("404 Not Found");
+            resp.
+
+                    setStatus(HttpServletResponse.SC_NOT_FOUND);
+            resp.
+
+                    getWriter().
+
+                    write("404 Not Found");
         }
     }
 

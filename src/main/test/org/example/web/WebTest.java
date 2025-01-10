@@ -204,7 +204,7 @@ public class WebTest {
         String requestBody = """
                 {
                     "username": "testUser",
-                    "password": "123"
+                    "password": 123
                 }
                 """;
 
@@ -268,6 +268,101 @@ public class WebTest {
                 .then()
                 .statusCode(200)
                 .body(equalTo("testUser")); // Assuming the user's name is returned
+    }
+
+    @Test
+    public void testGetAdminWithAdminRole() {
+        // Step 1: Perform Login with ROLE_ADMIN
+        String loginRequestBody = """
+                {
+                    "username": "adminUser",
+                    "password": "admin"
+                }
+                """;
+
+        Response loginResponse = given()
+                .contentType("application/json")
+                .body(loginRequestBody)
+                .when()
+                .post("/login")
+                .then()
+                .statusCode(200)
+                .extract().response();
+
+        // Step 2: Extract Session or Token
+        String sessionId = loginResponse.getHeader("Set-Cookie");
+
+        // Step 3: Test /getadmin for ROLE_ADMIN
+        given()
+                .header("Cookie", sessionId) // Pass the session ID
+                .when()
+                .post("/getadmin")
+                .then()
+                .statusCode(200)
+                .body(equalTo("adminUser")); // Assuming user's name is returned
+    }
+
+    @Test
+    public void testGetAdminWithoutAdminRole() {
+        // Step 1: Perform Login with a user who doesn't have ROLE_ADMIN
+        String loginRequestBody = """
+                {
+                    "username": "normalUser",
+                    "password": "123"
+                }
+                """;
+
+        Response loginResponse = given()
+                .contentType("application/json")
+                .body(loginRequestBody)
+                .when()
+                .post("/login")
+                .then()
+                .statusCode(200)
+                .extract().response();
+
+        // Step 2: Extract Session or Token
+        String sessionId = loginResponse.getHeader("Set-Cookie");
+
+        // Step 3: Test /getadmin for a non-admin user
+        given()
+                .header("Cookie", sessionId)
+                .when()
+                .post("/getadmin")
+                .then()
+                .statusCode(403); // Access should be denied
+    }
+
+    @Test
+    public void testAnyWithAdminOrUserRole() {
+        // Step 1: Perform Login with ROLE_ADMIN or ROLE_USER
+        String loginRequestBody = """
+                {
+                    "username": "userWithRoles",
+                    "password": "123"
+                }
+                """;
+
+        Response loginResponse = given()
+                .contentType("application/json")
+                .body(loginRequestBody)
+                .when()
+                .post("/login")
+                .then()
+                .statusCode(200)
+                .extract().response();
+
+        // Step 2: Extract Session or Token
+        String sessionId = loginResponse.getHeader("Set-Cookie");
+
+        // Step 3: Test /getadmin for ROLE_ADMIN or ROLE_USER
+        given()
+                .header("Cookie", sessionId)
+                .when()
+                .post("/getany")
+                .then()
+                .statusCode(200)
+                .body(equalTo("userWithRoles")); // Assuming user's name is returned
     }
 
     @BeforeAll

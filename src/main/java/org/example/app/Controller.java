@@ -8,6 +8,7 @@ import org.example.app.service.UserService;
 import org.example.framework.core.annotations.Inject;
 import org.example.framework.core.annotations.OnDestroy;
 import org.example.framework.core.annotations.OnInit;
+import org.example.framework.security.annotations.PreAuthorize;
 import org.example.framework.security.session.SessionService;
 import org.example.framework.security.user.UserDetails;
 import org.example.framework.web.annotations.PathVariable;
@@ -102,7 +103,21 @@ public class Controller {
     }
 
     @RequestMapping(path = "/getCurrentUser", method = RequestType.POST)
-    public ResponseEntity<String> login(UserDetails userDetails) {
+    public ResponseEntity<String> getCurrentUser(UserDetails userDetails) {
+        System.out.println(userDetails.toString());
+        return new ResponseEntity<>(200, userDetails.getName());
+    }
+
+    @RequestMapping(path = "/getadmin", method = RequestType.POST)
+    @PreAuthorize(allowedAuthorities = {"ROLE_ADMIN"})
+    public ResponseEntity<String> getadmin(UserDetails userDetails) {
+        System.out.println(userDetails.toString());
+        return new ResponseEntity<>(200, userDetails.getName());
+    }
+
+    @RequestMapping(path = "/getany", method = RequestType.POST)
+    @PreAuthorize(allowedAuthorities = {"ROLE_ADMIN", "ROLE_USER"})
+    public ResponseEntity<String> any(UserDetails userDetails) {
         System.out.println(userDetails.toString());
         return new ResponseEntity<>(200, userDetails.getName());
     }

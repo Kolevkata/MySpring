@@ -1,16 +1,14 @@
 package org.example.framework.security.user;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class UserDetails {
     private String name;
-    private List<Authority> authorities;
+    private Set<Authority> authorities;
 
     public UserDetails() {
-        this.authorities = new ArrayList<>();
+        this.authorities = new HashSet<>();
     }
 
     public String getName() {
@@ -21,7 +19,7 @@ public class UserDetails {
         this.name = name;
     }
 
-    public List<Authority> getAuthorities() {
+    public Set<Authority> getAuthorities() {
         return authorities;
     }
 
