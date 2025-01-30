@@ -123,7 +123,7 @@ public class DispatcherServlet extends HttpServlet {
                         resp.setContentType("application/json");
                         String json = "";
                         if (body != null) {
-                            json = this.jsonSerializer.toJson(body);
+                            json = this.jsonSerializer.serialize(body);
                         }
                         resp.setStatus(responseEntity.getStatus());
                         resp.getWriter().write(json);
@@ -238,7 +238,7 @@ public class DispatcherServlet extends HttpServlet {
                 } else if (Collection.class.isAssignableFrom(param.getType())) {
                     o = handleCollection(param, body);
                 } else {
-                    o = jsonSerializer.fromJson(body, param.getType());
+                    o = jsonSerializer.deserialize(body, param.getType());
                 }
                 return o;
             } else if (param.getType().equals(String.class)) {
@@ -264,7 +264,7 @@ public class DispatcherServlet extends HttpServlet {
 
                 for (int i = 0; i < subJsons.length; i++) {
                     String s = subJsons[i];
-                    Object o = jsonSerializer.fromJson(s, (Class<?>) typeArg);
+                    Object o = jsonSerializer.deserialize(s, (Class<?>) typeArg);
                     list.add(o);
                 }
                 return list;
@@ -282,7 +282,7 @@ public class DispatcherServlet extends HttpServlet {
         Object arr = Array.newInstance(componentType, subJsons.length);
         for (int i = 0; i < subJsons.length; i++) {
             String s = subJsons[i];
-            Object o = jsonSerializer.fromJson(s, componentType);
+            Object o = jsonSerializer.deserialize(s, componentType);
             Array.set(arr, i, o);
         }
         return arr;

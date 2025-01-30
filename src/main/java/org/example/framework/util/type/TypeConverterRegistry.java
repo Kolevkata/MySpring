@@ -180,8 +180,5 @@ public class TypeConverterRegistry {
         registerConverter(String.class, Currency.class, Currency::getInstance);
         registerConverter(String.class, Locale.class, Locale::forLanguageTag);
         registerConverter(String.class, TimeZone.class, TimeZone::getTimeZone);
-
     }
-
-
 }

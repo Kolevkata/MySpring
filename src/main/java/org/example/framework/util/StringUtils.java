@@ -27,7 +27,6 @@ public class StringUtils {
         return output.toString();
     }
 
-
     // More readable solution using Pattern matching
     public static String[] splitPreservingQuotesAndBrackets(String str, char delimiter) {
         List<String> result = new ArrayList<>();

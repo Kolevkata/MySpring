@@ -14,7 +14,7 @@ import java.util.*;
 import java.util.logging.Logger;
 
 @Component
-public class JSONSerializer {
+public class JSONSerializer implements Serializator {
     private static final Logger log = Logger.getLogger(JSONSerializer.class.getName());
     @Inject
     private TypeConverterRegistry typeConverterRegistry;
@@ -22,96 +22,84 @@ public class JSONSerializer {
     public JSONSerializer() {
     }
 
-    private String resolveName(Field field) {
-        if (field.isAnnotationPresent(JsonValue.class)) {
-            JsonValue annotation = field.getAnnotation(JsonValue.class);
-            return annotation.value();
-        }
-        return field.getName();
+    boolean isNotSerializable(Object obj) {
+        return !(obj instanceof Serializable);
     }
 
-    public String toJson(Object obj) {
-        if (!(obj instanceof Serializable)) {
+    boolean isIterableOrArray(Object obj) {
+        return obj instanceof Iterable<?> || obj.getClass().isArray();
+    }
+
+    @Override
+    public String serialize(Object obj) {
+        if (isNotSerializable(obj)) {
             log.severe("Class " + obj.getClass().getName() + " is not market Serializable");
             return null;
         }
 
-        StringBuilder out = new StringBuilder();
-        if (obj instanceof Iterable<?> || obj.getClass().isArray()) {
-            out.append("[");
-
-            // Check if the object is an Iterable or an array
-            if (obj instanceof Iterable<?>) {
-                // Process Iterable
-                for (Object element : (Iterable<?>) obj) {
-                    Optional<String> converted = convertJsonStringify(element);
-                    out.append(converted.orElseGet(() -> toJson(element)));
-                    out.append(",");
-                }
-            } else {
-                // Process Array
-                int length = Array.getLength(obj);
-                for (int i = 0; i < length; i++) {
-                    Object element = Array.get(obj, i);
-                    Optional<String> converted = convertJsonStringify(element);
-                    out.append(converted.orElseGet(() -> toJson(element)));
-                    out.append(",");
-                }
-            }
-
-            // Remove the last comma (if any)
-            if (out.charAt(out.length() - 1) == ',') {
-                out.setLength(out.length() - 1);
-            }
-
-            out.append("]");
-        } else {
-            out.append("{");
-            List<Field> fields = Arrays.stream(obj.getClass().getDeclaredFields()).filter(field -> !field.isSynthetic()).toList();
-            for (int i = 0; i < fields.size(); i++) {
-                Field field = fields.get(i);
-                field.setAccessible(true);
-                try {
-                    Object fieldInstance = field.get(obj);
-                    String fieldName = resolveName(field);
-                    out.append(resolveFieldToJSONString(fieldInstance, fieldName));
-                    field.setAccessible(true);
-                    if (i != fields.size() - 1) {
-                        out.append(",");
-                    }
-                } catch (IllegalAccessException e) {
-                    log.severe("field " + field.getName() + " not found");
-                    e.printStackTrace();
-                }
-            }
-            out.append("}");
+        if (isIterableOrArray(obj)) {
+            return buildJsonArray(obj);
         }
+        return buildJsonObject(obj);
+    }
+
+
+
+    private String buildJsonObject(Object obj) {
+        List<Field> fields = getNonSyntheticFields(obj);
+        List<String> keyValuePairs = new ArrayList<>();
+        for (Field field : fields) {
+            field.setAccessible(true);
+            try {
+                String keyValuePair = turnFieldToJSONKeyValuePair(obj, field);
+                keyValuePairs.add(keyValuePair);
+            } catch (IllegalAccessException e) {
+                log.severe("field " + field.getName() + " not found");
+            }
+        }
+        String joinedKeyValuePairs = String.join(",", keyValuePairs);
+        return "{" + joinedKeyValuePairs + "}";
+    }
+
+    private String turnFieldToJSONKeyValuePair(Object obj, Field field) throws IllegalAccessException {
+        Object fieldInstance = field.get(obj);
+        String fieldName = getSerializedNameOfField(field);
+        return stringifyKeyValuePair(fieldInstance, fieldName);
+    }
+
+    private String buildJsonArray(Object obj) {
+        StringBuilder out = new StringBuilder();
+        out.append("[");
+        // Check if the object is an Iterable or an array
+        if (obj instanceof Iterable<?>) {
+            // Process Iterable
+            for (Object element : (Iterable<?>) obj) {
+                Optional<String> converted = convertJsonStringify(element);
+                out.append(converted.orElseGet(() -> serialize(element)));
+                out.append(",");
+            }
+        } else {
+            // Process Array
+            int length = Array.getLength(obj);
+            for (int i = 0; i < length; i++) {
+                Object element = Array.get(obj, i);
+                Optional<String> converted = convertJsonStringify(element);
+                out.append(converted.orElseGet(() -> serialize(element)));
+                out.append(",");
+            }
+        }
+
+        // Remove the last comma (if any)
+        if (out.charAt(out.length() - 1) == ',') {
+            out.setLength(out.length() - 1);
+        }
+
+        out.append("]");
         return out.toString();
     }
 
-
-    private String resolveFieldToJSONString(Object fieldInstance, String fieldName) {
-        String stringFomat = "\"" + fieldName + "\":%s";
-        if (fieldInstance == null) {
-            stringFomat = "\"" + fieldName + "\":%s";
-            return String.format(stringFomat, "null");
-        }
-        Optional<String> converted = convertJsonStringify(fieldInstance);
-        if (converted.isPresent()) {
-            return String.format(stringFomat, converted.get());
-        } else {
-            return String.format(stringFomat, toJson(fieldInstance));
-        }
-    }
-
-
-    private boolean isJsonObj(String str) {
-        return (str.charAt(0) == '{' && str.charAt(str.length() - 1) == '}') ||
-                (str.charAt(0) == '[' && str.charAt(str.length() - 1) == ']');
-
-    }
-
-    public <T> T fromJson(String json, Class<T> classOfT) {
+    @Override
+    public <T> T deserialize(String json, Class<T> classOfT) {
         StringBuffer sb = new StringBuffer(StringUtils.removeWhiteSpace(json));
 
         T instance;
@@ -140,6 +128,36 @@ public class JSONSerializer {
         return instance;
     }
 
+    private String getSerializedNameOfField(Field field) {
+        if (field.isAnnotationPresent(JsonValue.class)) {
+            JsonValue annotation = field.getAnnotation(JsonValue.class);
+            return annotation.value();
+        }
+        return field.getName();
+    }
+
+    private String stringifyKeyValuePair(Object fieldInstance, String fieldName) {
+        String stringFomat = "\"" + fieldName + "\":%s";
+        if (fieldInstance == null) {
+            return String.format(stringFomat, "null");
+        }
+        Optional<String> converted = convertJsonStringify(fieldInstance);
+        if (converted.isPresent()) {
+            return String.format(stringFomat, converted.get());
+        } else {
+            String innerObject = serialize(fieldInstance);
+            return String.format(stringFomat, innerObject);
+        }
+    }
+
+
+    private boolean isJsonObj(String str) {
+        return (str.charAt(0) == '{' && str.charAt(str.length() - 1) == '}') ||
+                (str.charAt(0) == '[' && str.charAt(str.length() - 1) == ']');
+
+    }
+
+
     private <T> void setField(String fieldValueStr, T instance) {
         String[] keyValue = fieldValueStr.split(":", 2);
         String key = keyValue[0].trim().replaceAll("\"", ""); // Remove quotes
@@ -162,7 +180,7 @@ public class JSONSerializer {
                 if (parsedValue.isPresent()) {
                     field.set(instance, parsedValue.get());
                 } else {
-                    Object o = fromJson(value, field.getType());
+                    Object o = deserialize(value, field.getType());
                     field.set(instance, o);
                 }
             }
@@ -202,6 +220,7 @@ public class JSONSerializer {
 
         return list;
     }
+
     public Optional<String> convertJsonStringify(Object value) {
         if (value == null) {
             return Optional.of("null"); // Or handle as per your use case, e.g., throw an exception

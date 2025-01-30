@@ -100,7 +100,7 @@ public class WebTest {
         B b = new B("test", 789);
         given()
                 .contentType(ContentType.JSON)
-                .body(jsonSerializer.toJson(b))
+                .body(jsonSerializer.serialize(b))
                 .when()
                 .post("/testSimpleJSON")
                 .then()
@@ -114,7 +114,7 @@ public class WebTest {
         B b = new B("test", 789);
         given()
                 .contentType(ContentType.JSON)
-                .body(jsonSerializer.toJson(b))
+                .body(jsonSerializer.serialize(b))
                 .queryParam("idx", 101)
                 .when()
                 .post("/testSimpleJSONWithParam")
@@ -130,7 +130,7 @@ public class WebTest {
         A a = new A("testA", 123);
         given()
                 .contentType(ContentType.JSON)
-                .body(jsonSerializer.toJson(a))
+                .body(jsonSerializer.serialize(a))
                 .when()
                 .post("/testCompleteJSON")
                 .then()
