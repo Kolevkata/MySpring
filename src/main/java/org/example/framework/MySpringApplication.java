@@ -18,42 +18,44 @@ import java.util.logging.Logger;
 
 public class MySpringApplication {
     private static final Logger log = Logger.getLogger(MySpringApplication.class.getName());
-    private static Tomcat tomcat;
-    private static Thread serverThread;
+    private Tomcat tomcat;
+    private Thread serverThread;
+    private IOContainer ioContainer;
 
-    public static void start() {
-
-        IOContainer ioc = IOContainer.getInstance();
+    private MySpringApplication(boolean serverApplication) {
+        ioContainer = IOContainer.getInstance();
         log.info("IOC container initialized");
         //run Lifecycle beans
         List<Method> onInitMethods = MethodScanner.scan("org", OnInit.class);
         runMethods(onInitMethods);
 
         //tomcat
-        int port = 8080;
-        tomcat = new Tomcat();
-        tomcat.setBaseDir("temp");
-        tomcat.setPort(port);
-        String contextPath = "";
-        String docBase = new File(".").getAbsolutePath();
+        if (serverApplication) {
+            int port = 8080;
+            tomcat = new Tomcat();
+            tomcat.setBaseDir("temp");
+            tomcat.setPort(port);
+            String contextPath = "";
+            String docBase = new File(".").getAbsolutePath();
 
-        Context context = tomcat.addContext(contextPath, docBase);
-        DispatcherServlet dispatcherServlet = (DispatcherServlet) ioc.getBean(DispatcherServlet.class);
-        Wrapper wrapper = Tomcat.addServlet(context, "dispatcher", dispatcherServlet);
-        wrapper.setLoadOnStartup(1);
-        context.addServletMappingDecoded("/*", "dispatcher");
+            Context context = tomcat.addContext(contextPath, docBase);
+            DispatcherServlet dispatcherServlet = (DispatcherServlet) ioContainer.getBean(DispatcherServlet.class);
+            Wrapper wrapper = Tomcat.addServlet(context, "dispatcher", dispatcherServlet);
+            wrapper.setLoadOnStartup(1);
+            context.addServletMappingDecoded("/*", "dispatcher");
 
-        tomcat.getConnector();
+            tomcat.getConnector();
 
-        try {
-            tomcat.start();
-            log.info("Tomcat started successfully on port " + port);
-            serverThread = new Thread(() -> tomcat.getServer().await());
-            serverThread.setDaemon(true);
-            serverThread.start();
-        } catch (LifecycleException e) {
-            log.severe("Failed to start Tomcat");
-            e.printStackTrace();
+            try {
+                tomcat.start();
+                log.info("Tomcat started successfully on port " + port);
+                serverThread = new Thread(() -> tomcat.getServer().await());
+                serverThread.setDaemon(true);
+                serverThread.start();
+            } catch (LifecycleException e) {
+                log.severe("Failed to start Tomcat");
+                e.printStackTrace();
+            }
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -62,7 +64,17 @@ public class MySpringApplication {
         }));
     }
 
-    public static void shutdown() {
+    public static MySpringApplication start() {
+        MySpringApplication application = new MySpringApplication(true);
+        return application;
+    }
+
+    public static MySpringApplication start(boolean serverApplication) {
+        MySpringApplication application = new MySpringApplication(serverApplication);
+        return application;
+    }
+
+    public void shutdown() {
         //run shutdown methods
         List<Method> onDestroyMethods = MethodScanner.scan("org", OnDestroy.class);
         runMethods(onDestroyMethods);
@@ -93,5 +105,9 @@ public class MySpringApplication {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public IOContainer getIoContainer() {
+        return ioContainer;
     }
 }

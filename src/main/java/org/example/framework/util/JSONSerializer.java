@@ -1,19 +1,28 @@
 package org.example.framework.util;
 
+import org.example.framework.core.annotations.Component;
+import org.example.framework.core.annotations.Inject;
+import org.example.framework.util.type.TypeConverterRegistry;
 import org.example.framework.web.annotations.JsonValue;
 
 import java.io.Serializable;
 import java.lang.reflect.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.logging.Logger;
 
-public class JSON {
-    private static final Logger log = Logger.getLogger(JSON.class.getName());
+@Component
+public class JSONSerializer {
+    private static final Logger log = Logger.getLogger(JSONSerializer.class.getName());
+    @Inject
+    private TypeConverterRegistry typeConverterRegistry;
 
-    private JSON() {
+    public JSONSerializer() {
     }
 
-    private static String resolveName(Field field) {
+    private String resolveName(Field field) {
         if (field.isAnnotationPresent(JsonValue.class)) {
             JsonValue annotation = field.getAnnotation(JsonValue.class);
             return annotation.value();
@@ -21,7 +30,7 @@ public class JSON {
         return field.getName();
     }
 
-    public static String toJson(Object obj) {
+    public String toJson(Object obj) {
         if (!(obj instanceof Serializable)) {
             log.severe("Class " + obj.getClass().getName() + " is not market Serializable");
             return null;
@@ -34,10 +43,8 @@ public class JSON {
             // Check if the object is an Iterable or an array
             if (obj instanceof Iterable<?>) {
                 // Process Iterable
-                Iterator<?> iterator = ((Iterable<?>) obj).iterator();
-                while (iterator.hasNext()) {
-                    Object element = iterator.next();
-                    Optional<String> converted = TypeConverter.convertJsonStringify(element);
+                for (Object element : (Iterable<?>) obj) {
+                    Optional<String> converted = convertJsonStringify(element);
                     out.append(converted.orElseGet(() -> toJson(element)));
                     out.append(",");
                 }
@@ -46,7 +53,7 @@ public class JSON {
                 int length = Array.getLength(obj);
                 for (int i = 0; i < length; i++) {
                     Object element = Array.get(obj, i);
-                    Optional<String> converted = TypeConverter.convertJsonStringify(element);
+                    Optional<String> converted = convertJsonStringify(element);
                     out.append(converted.orElseGet(() -> toJson(element)));
                     out.append(",");
                 }
@@ -83,28 +90,28 @@ public class JSON {
     }
 
 
-    private static String resolveFieldToJSONString(Object fieldInstance, String fieldName) {
+    private String resolveFieldToJSONString(Object fieldInstance, String fieldName) {
         String stringFomat = "\"" + fieldName + "\":%s";
         if (fieldInstance == null) {
             stringFomat = "\"" + fieldName + "\":%s";
             return String.format(stringFomat, "null");
         }
-        Optional<String> converted = TypeConverter.convertJsonStringify(fieldInstance);
+        Optional<String> converted = convertJsonStringify(fieldInstance);
         if (converted.isPresent()) {
             return String.format(stringFomat, converted.get());
         } else {
-            return String.format(stringFomat, JSON.toJson(fieldInstance));
+            return String.format(stringFomat, toJson(fieldInstance));
         }
     }
 
 
-    private static boolean isJsonObj(String str) {
+    private boolean isJsonObj(String str) {
         return (str.charAt(0) == '{' && str.charAt(str.length() - 1) == '}') ||
                 (str.charAt(0) == '[' && str.charAt(str.length() - 1) == ']');
 
     }
 
-    public static <T> T fromJson(String json, Class<T> classOfT) {
+    public <T> T fromJson(String json, Class<T> classOfT) {
         StringBuffer sb = new StringBuffer(StringUtils.removeWhiteSpace(json));
 
         T instance;
@@ -133,7 +140,7 @@ public class JSON {
         return instance;
     }
 
-    private static <T> void setField(String fieldValueStr, T instance) {
+    private <T> void setField(String fieldValueStr, T instance) {
         String[] keyValue = fieldValueStr.split(":", 2);
         String key = keyValue[0].trim().replaceAll("\"", ""); // Remove quotes
         String value = isJsonObj(keyValue[1]) ?
@@ -151,7 +158,7 @@ public class JSON {
                 List<?> parsedList = parseJsonArray(value, elementType);
                 field.set(instance, parsedList);
             } else {
-                Optional<?> parsedValue = TypeConverter.convert(value, field.getType());
+                Optional<?> parsedValue = typeConverterRegistry.convert(value, field.getType());
                 if (parsedValue.isPresent()) {
                     field.set(instance, parsedValue.get());
                 } else {
@@ -179,7 +186,7 @@ public class JSON {
         return null;
     }
 
-    private static <T> List<T> parseJsonArray(String jsonArray, Class<?> elementType) {
+    private <T> List<T> parseJsonArray(String jsonArray, Class<?> elementType) {
         jsonArray = jsonArray.trim();
         if (jsonArray.startsWith("[") && jsonArray.endsWith("]")) {
             jsonArray = jsonArray.substring(1, jsonArray.length() - 1).trim();
@@ -189,10 +196,61 @@ public class JSON {
         List<T> list = new ArrayList<>();
 
         for (String element : elements) {
-            T item = (T) TypeConverter.convert(element, elementType).get();
+            T item = (T) typeConverterRegistry.convert(element, elementType);
             list.add(item);
         }
 
         return list;
+    }
+    public Optional<String> convertJsonStringify(Object value) {
+        if (value == null) {
+            return Optional.of("null"); // Or handle as per your use case, e.g., throw an exception
+        }
+
+        Class<?> type = value.getClass();
+        // If the type has a registered converter in TO_STRING_CONVERTERS
+        if (typeConverterRegistry.hasConverter(type, String.class)) {
+            // Use the registered converter for the type
+            String result = typeConverterRegistry.convert(value, String.class).orElseThrow(() -> new RuntimeException("Cannot convert " + value + " to string"));
+
+            if (shouldWrapInQuotes(value)) {
+                return Optional.of("\"" + result + "\"");
+            } else {
+                return Optional.ofNullable(result);
+            }
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    private boolean shouldWrapInQuotes(Object obj) {
+        if (obj == null) {
+            return false; // null is not wrapped in quotes
+        }
+
+        Class<?> clazz = obj.getClass();
+
+        // Strings, characters, enums, dates, and other "string-convertible" types
+        if (obj instanceof String ||
+                obj instanceof Character ||
+                clazz.isEnum() ||
+                obj instanceof Date ||
+                obj instanceof UUID ||
+                obj instanceof Currency ||
+                obj instanceof Locale ||
+                obj instanceof LocalDate ||
+                obj instanceof LocalDateTime ||
+                obj instanceof LocalTime ||
+                obj instanceof TimeZone) {
+            return true;
+        }
+
+        // Numbers and booleans are not wrapped in quotes
+        if (obj instanceof Number || obj instanceof Boolean) {
+            return false;
+        }
+
+        // Collections, arrays, and objects are typically serialized without quotes
+        return false;
     }
 }

@@ -6,8 +6,7 @@ import io.restassured.response.Response;
 import org.example.app.dto.A;
 import org.example.app.dto.B;
 import org.example.framework.MySpringApplication;
-import org.example.framework.util.JSON;
-import org.example.framework.util.TypeConverter;
+import org.example.framework.util.JSONSerializer;
 import org.junit.jupiter.api.*;
 
 import java.time.LocalDate;
@@ -18,6 +17,20 @@ import static io.restassured.RestAssured.*;
 import static org.hamcrest.Matchers.*;
 
 public class WebTest {
+    private static MySpringApplication application;
+    private static JSONSerializer jsonSerializer;
+
+    @BeforeAll
+    public static void init() {
+        RestAssured.baseURI = "http://localhost:8080";
+        application = MySpringApplication.start();
+        jsonSerializer = (JSONSerializer) application.getIoContainer().getBean(JSONSerializer.class);
+    }
+
+    @AfterAll
+    public static void destroy() {
+        application.shutdown();
+    }
 
     @Test
     public void contextLoad() {
@@ -87,7 +100,7 @@ public class WebTest {
         B b = new B("test", 789);
         given()
                 .contentType(ContentType.JSON)
-                .body(JSON.toJson(b))
+                .body(jsonSerializer.toJson(b))
                 .when()
                 .post("/testSimpleJSON")
                 .then()
@@ -101,7 +114,7 @@ public class WebTest {
         B b = new B("test", 789);
         given()
                 .contentType(ContentType.JSON)
-                .body(JSON.toJson(b))
+                .body(jsonSerializer.toJson(b))
                 .queryParam("idx", 101)
                 .when()
                 .post("/testSimpleJSONWithParam")
@@ -117,7 +130,7 @@ public class WebTest {
         A a = new A("testA", 123);
         given()
                 .contentType(ContentType.JSON)
-                .body(JSON.toJson(a))
+                .body(jsonSerializer.toJson(a))
                 .when()
                 .post("/testCompleteJSON")
                 .then()
@@ -160,11 +173,11 @@ public class WebTest {
     public void testListBWithListInput() {
         // JSON payload representing a List<B>
         String listOfBJson = """
-            [
-                {"fieldB1": "item1", "fieldB2": 10},
-                {"fieldB1": "item2", "fieldB2": 20}
-            ]
-            """;
+                [
+                    {"fieldB1": "item1", "fieldB2": 10},
+                    {"fieldB1": "item2", "fieldB2": 20}
+                ]
+                """;
 
         // Perform the POST request and validate the response
         given()
@@ -182,11 +195,11 @@ public class WebTest {
     public void testArrBWithArrayInput() {
         // JSON payload representing a B[]
         String arrayOfBJson = """
-            [
-                {"fieldB1": "element1", "fieldB2": 30},
-                {"fieldB1": "element2", "fieldB2": 40}
-            ]
-            """;
+                [
+                    {"fieldB1": "element1", "fieldB2": 30},
+                    {"fieldB1": "element2", "fieldB2": 40}
+                ]
+                """;
 
         // Perform the POST request and validate the response
         given()
@@ -199,6 +212,7 @@ public class WebTest {
                 .body(containsString("listOfB count: 2"))
                 .body(containsString("array: [B{fieldB1='element1', fieldB2=30},B{fieldB1='element2', fieldB2=40}]"));
     }
+
     @Test
     public void testSuccessfulLogin() {
         String requestBody = """
@@ -364,17 +378,4 @@ public class WebTest {
                 .statusCode(200)
                 .body(equalTo("userWithRoles")); // Assuming user's name is returned
     }
-
-    @BeforeAll
-    public static void init() {
-        RestAssured.baseURI = "http://localhost:8080";
-        MySpringApplication.start();
-    }
-
-
-    @AfterAll
-    public static void destroy() {
-        MySpringApplication.shutdown();
-    }
-
 }

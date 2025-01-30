@@ -1,7 +1,12 @@
 package org.example.util;
 
+import io.restassured.RestAssured;
+import org.example.framework.MySpringApplication;
+import org.example.framework.util.JSONSerializer;
 import org.example.framework.web.annotations.JsonValue;
-import org.example.framework.util.JSON;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
@@ -12,6 +17,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 
 public class JSONTest {
+    private static MySpringApplication application;
+    private static JSONSerializer jsonSerializer;
+
+    @BeforeAll
+    public static void init() {
+        RestAssured.baseURI = "http://localhost:8080";
+        application = MySpringApplication.start(false);
+        jsonSerializer = (JSONSerializer) application.getIoContainer().getBean(JSONSerializer.class);
+    }
+
+    @AfterAll
+    public static void destroy() {
+        application.shutdown();
+    }
 
     @Test
     public void testToJsonSimpleObject() {
@@ -23,7 +42,7 @@ public class JSONTest {
         String expectedJson = "{\"name\":\"John\",\"age\":30}";
 
         // Test the toJson method
-        assertEquals(expectedJson, JSON.toJson(person));
+        assertEquals(expectedJson, jsonSerializer.toJson(person));
     }
 
     @Test
@@ -38,7 +57,7 @@ public class JSONTest {
         String expectedJson = "[\"apple\",\"banana\",\"cherry\"]";
 
         // Test the toJson method with a collection
-        assertEquals(expectedJson, JSON.toJson(items));
+        assertEquals(expectedJson, jsonSerializer.toJson(items));
     }
 
     @Test
@@ -48,7 +67,7 @@ public class JSONTest {
         Person person = new Person("John", null);
 
         String expectedJson = "{\"name\":\"John\",\"age\":null}";
-        assertEquals(expectedJson, JSON.toJson(person));
+        assertEquals(expectedJson, jsonSerializer.toJson(person));
     }
 
     @Test
@@ -57,7 +76,7 @@ public class JSONTest {
         String json = "{\"name\": \"John\",\"age\": \"30\"}";
 
         // Deserialize JSON back to an object
-        Person person = JSON.fromJson(json, Person.class);
+        Person person = jsonSerializer.fromJson(json, Person.class);
 
         assertNotNull(person);
         assertEquals("John", person.name);
@@ -69,7 +88,7 @@ public class JSONTest {
         String invalidJson = "{\"name\":\"John\",\"age\":30";
 
         assertThrows(RuntimeException.class, () -> {
-            JSON.fromJson(invalidJson, Person.class);
+            jsonSerializer.fromJson(invalidJson, Person.class);
         });
     }
 
@@ -102,7 +121,7 @@ public class JSONTest {
 
         String expectedJson = "{\"name\":\"John\",\"address\":{\"street\":\"123 Main St\",\"city\":\"Anytown\"}}";
 
-        assertEquals(expectedJson, JSON.toJson(person));
+        assertEquals(expectedJson, jsonSerializer.toJson(person));
     }
 
     @Test
@@ -117,7 +136,7 @@ public class JSONTest {
 
         NotSerializableClass obj = new NotSerializableClass("Test");
 
-        assertNull(JSON.toJson(obj)); // Expecting null since the class is not serializable
+        assertNull(jsonSerializer.toJson(obj)); // Expecting null since the class is not serializable
     }
 
     @Test
@@ -138,7 +157,7 @@ public class JSONTest {
         Person2 person = new Person2("John", 30);
 
         String expectedJson = "{\"fullName\":\"John\",\"age\":30}";
-        assertEquals(expectedJson, JSON.toJson(person));
+        assertEquals(expectedJson, jsonSerializer.toJson(person));
     }
 
     @Test
@@ -150,7 +169,7 @@ public class JSONTest {
 
         String expectedJson = "{}";
 
-        assertEquals(expectedJson, JSON.toJson(emptyObject));
+        assertEquals(expectedJson, jsonSerializer.toJson(emptyObject));
     }
 
     @Test
@@ -159,7 +178,7 @@ public class JSONTest {
 
         String expectedJson = "[\"apple\",\"banana\",\"cherry\"]";
 
-        assertEquals(expectedJson, JSON.toJson(fruits));
+        assertEquals(expectedJson, jsonSerializer.toJson(fruits));
     }
 
 
@@ -183,7 +202,7 @@ public class JSONTest {
 
         String json = "{\"name\":\"John\",\"address\":{\"street\":\"123 Main St\",\"city\":\"Anytown\"}}";
 
-        PersonWithAddress person = JSON.fromJson(json, PersonWithAddress.class);
+        PersonWithAddress person = jsonSerializer.fromJson(json, PersonWithAddress.class);
 
         assertNotNull(person);
         assertEquals("John", person.name);
@@ -198,7 +217,7 @@ public class JSONTest {
 
         String expectedJson = "[]";
 
-        assertEquals(expectedJson, JSON.toJson(emptyList));
+        assertEquals(expectedJson, jsonSerializer.toJson(emptyList));
     }
 
 
@@ -207,7 +226,7 @@ public class JSONTest {
         String json = "{\"name\":\"John\",\"age\":30}";
 
         assertThrows(RuntimeException.class, () -> {
-            List<?> result = JSON.fromJson(json, List.class); // Trying to deserialize into a List
+            List<?> result = jsonSerializer.fromJson(json, List.class); // Trying to deserialize into a List
         });
     }
 
@@ -225,7 +244,7 @@ public class JSONTest {
 
         String expectedJson = "{\"active\":true}";
 
-        assertEquals(expectedJson, JSON.toJson(flag));
+        assertEquals(expectedJson, jsonSerializer.toJson(flag));
     }
 
     static class Flag implements Serializable {
@@ -239,7 +258,7 @@ public class JSONTest {
 
         String json = "{\"active\":true}";
 
-        Flag flag = JSON.fromJson(json, Flag.class);
+        Flag flag = jsonSerializer.fromJson(json, Flag.class);
 
         assertNotNull(flag);
         assertTrue(flag.active);
@@ -255,7 +274,7 @@ public class JSONTest {
 
         String expectedJson = "[\"text\",42,null,true]";
 
-        assertEquals(expectedJson, JSON.toJson(mixedList));
+        assertEquals(expectedJson, jsonSerializer.toJson(mixedList));
     }
 
     @Test
@@ -263,7 +282,7 @@ public class JSONTest {
         String malformedJson = "[\"apple\", \"banana\", ";
 
         assertThrows(RuntimeException.class, () -> {
-            List<?> result = JSON.fromJson(malformedJson, List.class);
+            List<?> result = jsonSerializer.fromJson(malformedJson, List.class);
         });
     }
 
@@ -283,7 +302,7 @@ public class JSONTest {
 
         String expectedJson = "{\"name\":\"Meeting\",\"date\":\"1970-01-01T00:00:00Z\"}";
 
-        assertEquals(expectedJson, JSON.toJson(event));
+        assertEquals(expectedJson, jsonSerializer.toJson(event));
     }
 
     static class Event implements Serializable {
@@ -298,7 +317,7 @@ public class JSONTest {
 
         String json = "{\"name\":\"Meeting\",\"date\":\"1970-01-01T00:00:00Z\"}";
 
-        Event event = JSON.fromJson(json, Event.class);
+        Event event = jsonSerializer.fromJson(json, Event.class);
 
         assertNotNull(event);
         assertEquals("Meeting", event.name);

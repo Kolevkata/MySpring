@@ -27,6 +27,7 @@ public class IOContainer {
 
     private Map<String, Object> beans = new HashMap<>();
 
+    //todo too long
     private IOContainer() {
         List<Class<?>> beanClasses = AnnotationClassScanner.scanForAnnotation(Component.class);
         beanClasses.addAll(AnnotationClassScanner.scanForAnnotation(Configuration.class));
@@ -65,6 +66,7 @@ public class IOContainer {
         beans.put(SessionService.class.getName(), new HttpSessionService());
     }
 
+    //todo to much nesting
     private void injectFieldDependencies(Object instance) {
         Class<?> clazz = instance.getClass();
         for (Field field : clazz.getDeclaredFields()) {
@@ -86,6 +88,7 @@ public class IOContainer {
         }
     }
 
+    //todo nesting
     private Object createBean(Class<?> clazz) {
         try {
             // Check for @Inject constructor
@@ -116,14 +119,6 @@ public class IOContainer {
             throw new RuntimeException("Failed to create bean for: " + clazz.getName(), e);
         }
     }
-
-//    public <T> T getBeanAndCast(Class<T> clazz) {
-//        Object bean = beans.get(clazz.getName());
-//        if (bean == null) {
-//            throw new RuntimeException("No bean found for type: " + clazz.getName());
-//        }
-//        return clazz.cast(bean); // Safely cast the bean to the desired type
-//    }
 
     public Object getBean(Class<?> clazz) {
         Object bean = beans.get(clazz.getName());

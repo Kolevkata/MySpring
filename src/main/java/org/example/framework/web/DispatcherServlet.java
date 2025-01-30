@@ -7,13 +7,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.example.framework.core.IOContainer;
 import org.example.framework.core.annotations.Component;
-import org.example.framework.core.annotations.Configuration;
 import org.example.framework.core.annotations.Inject;
 import org.example.framework.security.annotations.PreAuthorize;
 import org.example.framework.security.session.SessionService;
 import org.example.framework.security.user.Authority;
 import org.example.framework.security.user.UserDetails;
 import org.example.framework.util.*;
+import org.example.framework.util.type.TypeConverterRegistry;
 import org.example.framework.web.annotations.*;
 
 import java.io.BufferedReader;
@@ -32,7 +32,12 @@ public class DispatcherServlet extends HttpServlet {
 
     @Inject
     SessionService sessionService;
+    @Inject
+    JSONSerializer jsonSerializer;
+    @Inject
+    TypeConverterRegistry typeConverterRegistry;
 
+    //todo too long
     @Override
     public void init(ServletConfig config) {
         Map<String, Object> beans = IOContainer.getInstance().getBeans();
@@ -65,10 +70,11 @@ public class DispatcherServlet extends HttpServlet {
         }
     }
 
+    //todo
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String path = req.getRequestURI();
-        RequestType requestType = Mapper.stringToRequestType(req.getMethod());
+        RequestType requestType = RequestType.fromString(req.getMethod());
         Optional<Endpoint> endpoint = Endpoint.get(endpoints, requestType, path);
 
 
@@ -109,7 +115,7 @@ public class DispatcherServlet extends HttpServlet {
                         resp.setStatus(responseEntity.getStatus());
                         return;
                     }
-                    Optional<String> converted = TypeConverter.convert(body, String.class);
+                    Optional<String> converted = typeConverterRegistry.convert(body, String.class);
                     if (converted.isPresent()) {
                         resp.setStatus(responseEntity.getStatus());
                         resp.getWriter().write(converted.get());
@@ -117,7 +123,7 @@ public class DispatcherServlet extends HttpServlet {
                         resp.setContentType("application/json");
                         String json = "";
                         if (body != null) {
-                            json = JSON.toJson(body);
+                            json = this.jsonSerializer.toJson(body);
                         }
                         resp.setStatus(responseEntity.getStatus());
                         resp.getWriter().write(json);
@@ -145,6 +151,7 @@ public class DispatcherServlet extends HttpServlet {
         }
     }
 
+    
     private List<Object> injectParameters(Method method, HttpServletRequest req, HttpServletResponse resp) throws ServletException {
         List<Object> params = new ArrayList<>();
         for (Parameter param : method.getParameters()) {
@@ -178,7 +185,7 @@ public class DispatcherServlet extends HttpServlet {
         }
 
         String[] sourcePathSegments = req.getRequestURI().split("/");
-        String targetPath = Endpoint.get(endpoints, Mapper.stringToRequestType(req.getMethod()), req.getRequestURI()).get().getPath();
+        String targetPath = Endpoint.get(endpoints, RequestType.fromString(req.getMethod()), req.getRequestURI()).get().getPath();
         String[] targetSegments = targetPath.split("/");
         if (sourcePathSegments.length != targetSegments.length) {
             //should never happen but anyways
@@ -191,7 +198,7 @@ public class DispatcherServlet extends HttpServlet {
                 String currentPathVar = seg.substring(1, seg.length() - 1);
                 if (currentPathVar.equals(pathVarName)) {
                     String element = sourcePathSegments[i];
-                    Optional<?> o = TypeConverter.convert(element, param.getType());
+                    Optional<?> o = typeConverterRegistry.convert(element, param.getType());
                     if (o.isEmpty()) {
                         throw new ServletException(String.format("Cannot map path variable %s with value %s to type %s", element, req.getRequestURI(), param.getType().getName()));
                     }
@@ -209,7 +216,7 @@ public class DispatcherServlet extends HttpServlet {
             paramName = param.getName();
         }
         String parameter = req.getParameter(paramName);
-        Optional<?> o = TypeConverter.convert(parameter, param.getType());
+        Optional<?> o = typeConverterRegistry.convert(parameter, param.getType());
         if (o.isEmpty()) {
             throw new ServletException(String.format("Cannot map req param %s with value %s to type %s", paramName, req.getRequestURI(), param.getType().getName()));
         }
@@ -231,7 +238,7 @@ public class DispatcherServlet extends HttpServlet {
                 } else if (Collection.class.isAssignableFrom(param.getType())) {
                     o = handleCollection(param, body);
                 } else {
-                    o = JSON.fromJson(body, param.getType());
+                    o = jsonSerializer.fromJson(body, param.getType());
                 }
                 return o;
             } else if (param.getType().equals(String.class)) {
@@ -257,7 +264,7 @@ public class DispatcherServlet extends HttpServlet {
 
                 for (int i = 0; i < subJsons.length; i++) {
                     String s = subJsons[i];
-                    Object o = JSON.fromJson(s, (Class<?>) typeArg);
+                    Object o = jsonSerializer.fromJson(s, (Class<?>) typeArg);
                     list.add(o);
                 }
                 return list;
@@ -267,7 +274,7 @@ public class DispatcherServlet extends HttpServlet {
         return Collections.emptyList();
     }
 
-    private static Object handleArray(Parameter param, String body) {
+    private Object handleArray(Parameter param, String body) {
         Class<?> componentType = param.getType().getComponentType();
         body = StringUtils.removeWhiteSpace(body);
         body = body.substring(1, body.length() - 1);
@@ -275,7 +282,7 @@ public class DispatcherServlet extends HttpServlet {
         Object arr = Array.newInstance(componentType, subJsons.length);
         for (int i = 0; i < subJsons.length; i++) {
             String s = subJsons[i];
-            Object o = JSON.fromJson(s, componentType);
+            Object o = jsonSerializer.fromJson(s, componentType);
             Array.set(arr, i, o);
         }
         return arr;
