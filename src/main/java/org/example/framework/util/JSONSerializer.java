@@ -22,14 +22,6 @@ public class JSONSerializer implements Serializator {
     public JSONSerializer() {
     }
 
-    boolean isNotSerializable(Object obj) {
-        return !(obj instanceof Serializable);
-    }
-
-    boolean isIterableOrArray(Object obj) {
-        return obj instanceof Iterable<?> || obj.getClass().isArray();
-    }
-
     @Override
     public String serialize(Object obj) {
         if (isNotSerializable(obj)) {
@@ -38,14 +30,57 @@ public class JSONSerializer implements Serializator {
         }
 
         if (isIterableOrArray(obj)) {
-            return buildJsonArray(obj);
+            return serializeJsonArray(obj);
         }
-        return buildJsonObject(obj);
+        return serializeJsonObject(obj);
+    }
+
+    @Override
+    public <T> T deserialize(String json, Class<T> classOfT) {
+        if (!isJsonObj(json)) {
+            throw new RuntimeException("Invalid json: " + json);
+        }
+        try {
+            if (Collection.class.isAssignableFrom(classOfT)) {
+                throw new RuntimeException("Cannot map directly to collection, wrap collection in type token");
+            }
+            return deserializeJsonObject(json, classOfT);
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                 NoSuchMethodException e) {
+            log.severe("constructor not found for class " + classOfT.getName());
+            throw new RuntimeException(e);
+        }
+    }
+
+    private <T> T deserializeJsonObject(String json, Class<T> classOfT) throws InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchMethodException {
+        T instance;
+        Constructor<T> declaredConstructor = classOfT.getDeclaredConstructor();
+        declaredConstructor.setAccessible(true);
+        instance = declaredConstructor.newInstance();
+        instance = setFieldsOfJsonObjectInstance(instance, json);
+        return instance;
+    }
+
+    private <T> T setFieldsOfJsonObjectInstance(T instance, String json) {
+        String compressedJson = StringUtils.removeWhiteSpace(json);
+        String unwrappedJson = StringUtils.removeFirstAndLastCharacter(compressedJson);
+        String[] keyValuePairs = StringUtils.splitPreservingQuotesAndBrackets(unwrappedJson, ',');
+        for (String keyValuePair : keyValuePairs) {
+            setField(keyValuePair, instance);
+        }
+        return instance;
+    }
+
+    boolean isNotSerializable(Object obj) {
+        return !(obj instanceof Serializable);
+    }
+
+    boolean isIterableOrArray(Object obj) {
+        return obj instanceof Iterable<?> || obj.getClass().isArray();
     }
 
 
-
-    private String buildJsonObject(Object obj) {
+    private String serializeJsonObject(Object obj) {
         List<Field> fields = getNonSyntheticFields(obj);
         List<String> keyValuePairs = new ArrayList<>();
         for (Field field : fields) {
@@ -61,72 +96,34 @@ public class JSONSerializer implements Serializator {
         return "{" + joinedKeyValuePairs + "}";
     }
 
-    private String turnFieldToJSONKeyValuePair(Object obj, Field field) throws IllegalAccessException {
+    private String turnFieldToJSONKeyValuePair(Object obj, Field field) throws RuntimeException, IllegalAccessException {
         Object fieldInstance = field.get(obj);
         String fieldName = getSerializedNameOfField(field);
         return stringifyKeyValuePair(fieldInstance, fieldName);
     }
 
-    private String buildJsonArray(Object obj) {
-        StringBuilder out = new StringBuilder();
-        out.append("[");
-        // Check if the object is an Iterable or an array
-        if (obj instanceof Iterable<?>) {
-            // Process Iterable
-            for (Object element : (Iterable<?>) obj) {
-                Optional<String> converted = convertJsonStringify(element);
-                out.append(converted.orElseGet(() -> serialize(element)));
-                out.append(",");
+    //todo
+    private String serializeJsonArray(Object obj) {
+        List<String> arrayElements = new ArrayList<>();
+
+        if (obj instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                String arrayElement = convertObjectToJson(element);
+                arrayElements.add(arrayElement);
             }
         } else {
             // Process Array
             int length = Array.getLength(obj);
             for (int i = 0; i < length; i++) {
-                Object element = Array.get(obj, i);
-                Optional<String> converted = convertJsonStringify(element);
-                out.append(converted.orElseGet(() -> serialize(element)));
-                out.append(",");
+                Object o = Array.get(obj, i);
+                String arrayElement = convertObjectToJson(o);
+                arrayElements.add(arrayElement);
             }
         }
-
-        // Remove the last comma (if any)
-        if (out.charAt(out.length() - 1) == ',') {
-            out.setLength(out.length() - 1);
-        }
-
-        out.append("]");
-        return out.toString();
+        String joinedArrayElements = String.join(",", arrayElements);
+        return "[" + joinedArrayElements + "]";
     }
 
-    @Override
-    public <T> T deserialize(String json, Class<T> classOfT) {
-        StringBuffer sb = new StringBuffer(StringUtils.removeWhiteSpace(json));
-
-        T instance;
-        if (!isJsonObj(sb.toString())) {
-            throw new RuntimeException("Invalid json string");
-        }
-        sb.deleteCharAt(0);
-        sb.deleteCharAt(sb.length() - 1);
-        String[] pairs = StringUtils.splitPreservingQuotesAndBrackets(sb.toString(), ',');
-        try {
-            if (Collection.class.isAssignableFrom(classOfT)) {
-                throw new RuntimeException("Cannot map directly to collection, wrap collection in type token");
-            }
-
-            Constructor<T> declaredConstructor = classOfT.getDeclaredConstructor();
-            declaredConstructor.setAccessible(true);
-            instance = declaredConstructor.newInstance();
-            for (String pair : pairs) {
-                setField(pair, instance);
-            }
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
-                 NoSuchMethodException e) {
-            log.severe("constructor not found for class " + classOfT.getName());
-            throw new RuntimeException(e);
-        }
-        return instance;
-    }
 
     private String getSerializedNameOfField(Field field) {
         if (field.isAnnotationPresent(JsonValue.class)) {
@@ -138,16 +135,8 @@ public class JSONSerializer implements Serializator {
 
     private String stringifyKeyValuePair(Object fieldInstance, String fieldName) {
         String stringFomat = "\"" + fieldName + "\":%s";
-        if (fieldInstance == null) {
-            return String.format(stringFomat, "null");
-        }
-        Optional<String> converted = convertJsonStringify(fieldInstance);
-        if (converted.isPresent()) {
-            return String.format(stringFomat, converted.get());
-        } else {
-            String innerObject = serialize(fieldInstance);
-            return String.format(stringFomat, innerObject);
-        }
+        String converted = convertObjectToJson(fieldInstance);
+        return String.format(stringFomat, converted);
     }
 
 
@@ -159,14 +148,13 @@ public class JSONSerializer implements Serializator {
 
 
     private <T> void setField(String fieldValueStr, T instance) {
-        String[] keyValue = fieldValueStr.split(":", 2);
-        String key = keyValue[0].trim().replaceAll("\"", ""); // Remove quotes
-        String value = isJsonObj(keyValue[1]) ?
-                keyValue[1] :
-                keyValue[1].trim().replaceAll("\"", "");
+        String[] keyValuePair = fieldValueStr.split(":", 2);
+        String key = StringUtils.removeQuotes(keyValuePair[0].trim());
+        String value = isJsonObj(keyValuePair[1]) ?
+                keyValuePair[1] :
+                keyValuePair[1].trim().replaceAll("\"", "");
         try {
-            Field field = resolveField(instance, key);
-
+            Field field = getField(instance, key);
             field.setAccessible(true);
             // Check if field is a collection type
             if (Collection.class.isAssignableFrom(field.getType())) {
@@ -190,14 +178,14 @@ public class JSONSerializer implements Serializator {
         }
     }
 
-    private static <T> Field resolveField(T instance, String key) {
+    private static <T> Field getField(T instance, String fieldName) {
         for (Field field : instance.getClass().getDeclaredFields()) {
             field.setAccessible(true);
             if (field.isAnnotationPresent(JsonValue.class)) {
-                if (field.getAnnotation(JsonValue.class).value().equals(key)) {
+                if (field.getAnnotation(JsonValue.class).value().equals(fieldName)) {
                     return field;
                 }
-            } else if (field.getName().equals(key)) {
+            } else if (field.getName().equals(fieldName)) {
                 return field;
             }
         }
@@ -221,24 +209,16 @@ public class JSONSerializer implements Serializator {
         return list;
     }
 
-    public Optional<String> convertJsonStringify(Object value) {
+    public String convertObjectToJson(Object value) {
         if (value == null) {
-            return Optional.of("null"); // Or handle as per your use case, e.g., throw an exception
+            return "null";
         }
+        String result = typeConverterRegistry.convert(value, String.class).orElseGet(() -> serialize(value));
 
-        Class<?> type = value.getClass();
-        // If the type has a registered converter in TO_STRING_CONVERTERS
-        if (typeConverterRegistry.hasConverter(type, String.class)) {
-            // Use the registered converter for the type
-            String result = typeConverterRegistry.convert(value, String.class).orElseThrow(() -> new RuntimeException("Cannot convert " + value + " to string"));
-
-            if (shouldWrapInQuotes(value)) {
-                return Optional.of("\"" + result + "\"");
-            } else {
-                return Optional.ofNullable(result);
-            }
+        if (shouldWrapInQuotes(value)) {
+            return '"' + result + '"';
         } else {
-            return Optional.empty();
+            return result;
         }
     }
 

@@ -52,11 +52,18 @@ public class StringUtils {
             }
         }
 
-        if (current.length() > 0) {
+        if (!current.isEmpty()) {
             result.add(current.toString().trim());
         }
 
         return result.toArray(new String[0]);
     }
 
+    public static String removeQuotes(String str) {
+        return str.replaceAll("\"", ""); // Remove quotes
+    }
+
+    public static String removeFirstAndLastCharacter(String tr) {
+        return tr.substring(1, tr.length() - 1);
+    }
 }

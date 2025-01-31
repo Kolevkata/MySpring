@@ -180,6 +180,15 @@ public class JSONTest {
         assertEquals(expectedJson, jsonSerializer.serialize(fruits));
     }
 
+    @Test
+    public void testToJsonWithIterable() {
+        String[] fruits = {"apple", "banana", "cherry"};
+
+        String expectedJson = "[\"apple\",\"banana\",\"cherry\"]";
+
+        assertEquals(expectedJson, jsonSerializer.serialize(fruits));
+    }
+
 
     static class Address implements Serializable {
         private String street;

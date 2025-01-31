@@ -6,10 +6,7 @@ import org.example.app.dto.B;
 import org.example.app.dto.UserDTO;
 import org.example.app.service.UserService;
 import org.example.framework.core.annotations.Inject;
-import org.example.framework.core.annotations.OnDestroy;
-import org.example.framework.core.annotations.OnInit;
 import org.example.framework.security.annotations.PreAuthorize;
-import org.example.framework.security.session.SessionService;
 import org.example.framework.security.user.UserDetails;
 import org.example.framework.web.annotations.PathVariable;
 import org.example.framework.web.annotations.RequestBody;
@@ -64,7 +61,7 @@ public class Controller {
     }
 
     @RequestMapping(path = "/testReponseEntity", method = RequestType.GET)
-    public ResponseEntity<A> getA() {
+    public ResponseEntity<A> testReponseEntity() {
         A a = new A("this is object A", 42);
         B b1 = new B("this is b1", 11);
         B b2 = new B("this is b2", 22);
